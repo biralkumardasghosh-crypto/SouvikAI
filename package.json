@@ -38,7 +38,8 @@
         "react-markdown": "^9.0.1",
         "recharts": "^2.10.0",
         "remark-gfm": "^4.0.1",
-        "tailwind-merge": "^2.2.0"
+        "tailwind-merge": "^2.2.0",
+        "twilio": "^6.0.0"
     },
     "devDependencies": {
         "@types/node": "^20.10.0",

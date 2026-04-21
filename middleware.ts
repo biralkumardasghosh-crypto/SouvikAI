@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Auth routes - redirect authenticated users to chat
-    if (pathname === '/signin' || pathname === '/signup') {
+    if (pathname === '/signin' || pathname === '/signup' || pathname === '/verify-email') {
         const { user } = await updateSession(request);
         if (user) {
             return NextResponse.redirect(new URL('/', request.url));
@@ -37,6 +37,7 @@ export const config = {
         '/',
         '/signin',
         '/signup',
+        '/verify-email',
         '/admin/:path*',
     ],
 };
