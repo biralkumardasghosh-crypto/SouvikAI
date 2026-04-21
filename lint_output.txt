@@ -1,0 +1,38 @@
+
+> souviks-ai-chat@1.0.0 lint
+> next lint
+
+
+./src/hooks/useAdmin.ts
+7:10  Error: 'ChatSession' is defined but never used.  @typescript-eslint/no-unused-vars
+7:23  Error: 'Message' is defined but never used.  @typescript-eslint/no-unused-vars
+19:12  Error: 'error' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+101:23  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+180:23  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/hooks/useAuth.tsx
+168:8  Warning: React Hook useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/hooks/useChat.ts
+27:47  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+85:50  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+101:23  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+101:48  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+167:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+178:32  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+244:32  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+268:36  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+277:8  Warning: React Hook useCallback has a missing dependency: 'selectedModelId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+298:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+314:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/preload.ts
+9:39  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+10:38  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+17:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+43:57  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+70:29  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+71:30  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+90:67  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
