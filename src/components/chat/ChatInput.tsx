@@ -6,7 +6,7 @@ import { useChatPreferences } from '@/hooks/useChatPreferences';
 import { useAttachments } from '@/hooks/useAttachments';
 import { AttachmentChip } from './AttachmentChip';
 import { IMAGE_ACCEPT, DOCUMENT_ACCEPT } from '@/utils/attachments';
-import { ArrowUp, Square, Plus, Mic, Paperclip, ImagePlus, Lightbulb, Globe, MoreHorizontal, ChevronRight, FileText, Loader2 } from 'lucide-react';
+import { ArrowUp, Square, Plus, Mic, Paperclip, ImagePlus, Lightbulb, Globe, MoreHorizontal, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/types/attachments';
 

@@ -26,6 +26,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         >
             {/* Thumbnail or icon */}
             {isImage && attachment.base64 ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                     src={attachment.base64}
                     alt={attachment.name}

@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Loader2, RefreshCw, Copy, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import {
     Select,
     SelectContent,
