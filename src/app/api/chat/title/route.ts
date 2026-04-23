@@ -64,7 +64,7 @@ Assistant: ${assistantSnippet}`;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10_000);
 
-        let title = (session as any).title; // fallback to existing title on any failure
+        let title = (session as { title: string }).title; // fallback to existing title on any failure
 
         try {
             const nimResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
