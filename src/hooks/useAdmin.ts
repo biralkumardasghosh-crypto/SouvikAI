@@ -22,7 +22,7 @@ export function useAdmin() {
 
     const checkAuth = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/auth/check');
+            const response = await fetch('/api/admin/auth/check', { cache: 'no-store' });
             setIsAuthenticated(response.ok);
             return response.ok;
         } catch {
@@ -56,7 +56,7 @@ export function useAdmin() {
 
     const fetchSettings = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/settings');
+            const response = await fetch('/api/admin/settings', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
                 setSettings(data);
@@ -96,7 +96,7 @@ export function useAdmin() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/admin/users');
+            const response = await fetch('/api/admin/users', { cache: 'no-store' });
             if (!response.ok) throw new Error('Failed to fetch users');
             const data = await response.json();
             setUsers(data);
@@ -178,7 +178,7 @@ export function useAdmin() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/admin/models');
+            const response = await fetch('/api/admin/models', { cache: 'no-store' });
             if (!response.ok) throw new Error('Failed to fetch models');
             const data = await response.json();
             setModels(data);
@@ -208,7 +208,7 @@ export function useAdmin() {
 
     const fetchStats = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/stats');
+            const response = await fetch('/api/admin/stats', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
                 setStats(data);
@@ -220,7 +220,7 @@ export function useAdmin() {
 
     const fetchChartData = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/requests/chart');
+            const response = await fetch('/api/admin/requests/chart', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
                 setChartData(data);
@@ -232,7 +232,7 @@ export function useAdmin() {
 
     const fetchSystemPrompt = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/system-prompt');
+            const response = await fetch('/api/admin/system-prompt', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
                 return data.content;
@@ -258,7 +258,7 @@ export function useAdmin() {
 
     const fetchAnalytics = useCallback(async () => {
         try {
-            const response = await fetch('/api/admin/analytics');
+            const response = await fetch('/api/admin/analytics', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
                 setAnalyticsData(data);

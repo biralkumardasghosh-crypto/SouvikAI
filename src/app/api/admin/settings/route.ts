@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { Database } from '@/types/database';
+
+export const dynamic = 'force-dynamic';
 
 type AdminSettingsRow = Database['public']['Tables']['admin_settings']['Row'];
 
@@ -16,7 +18,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = await createServiceClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: any = await supabase
@@ -47,7 +49,7 @@ export async function PUT(request: NextRequest) {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase: any = await createClient();
+  const supabase: any = await createServiceClient();
   const body = await request.json();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function SignInPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { signIn } = useAuth();
     const router = useRouter();
 
@@ -83,16 +84,26 @@ export default function SignInPage() {
                                 Forgot password?
                             </Link>
                         </div>
-                        <Input
-                            id="password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            disabled={isLoading}
-                            className="bg-background/50 border-input/50 focus:bg-background transition-colors"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                disabled={isLoading}
+                                className="bg-background/50 border-input/50 focus:bg-background transition-colors pr-10"
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
                     </div>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">

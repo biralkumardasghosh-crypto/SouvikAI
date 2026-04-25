@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export const dynamic = 'force-dynamic';
+
 async function checkAdminAuth() {
   const cookieStore = await cookies();
   const session = cookieStore.get('admin_session');

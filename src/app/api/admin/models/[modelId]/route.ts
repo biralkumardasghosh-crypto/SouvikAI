@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 async function checkAdminAuth() {
@@ -32,7 +32,7 @@ export async function PUT(
             return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
         }
 
-        const supabase = await createClient();
+        const supabase = await createServiceClient();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error } = await (supabase as any)
             .from('models')

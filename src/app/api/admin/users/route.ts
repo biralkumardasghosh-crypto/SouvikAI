@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
 import { Database } from '@/types/database';
 
+export const dynamic = 'force-dynamic';
+
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 async function checkAdminAuth() {

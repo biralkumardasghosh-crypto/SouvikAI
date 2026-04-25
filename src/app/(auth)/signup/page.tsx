@@ -8,7 +8,7 @@ import {
     Card, CardHeader, CardTitle, CardDescription,
     CardContent, CardFooter,
 } from '@/components/ui';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const SESSION_PASSWORD_KEY = 'pending_signup_password';
 
@@ -28,6 +28,8 @@ export default function SignUpPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError]                     = useState('');
     const [isLoading, setIsLoading]             = useState(false);
+    const [showPassword, setShowPassword]       = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,30 +112,50 @@ export default function SignUpPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="password">Password</Label>
-                        <Input
-                            id="password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            disabled={isLoading}
-                            className="bg-background/50 border-input/50 focus:bg-background transition-colors"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                disabled={isLoading}
+                                className="bg-background/50 border-input/50 focus:bg-background transition-colors pr-10"
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="confirmPassword">Confirm password</Label>
-                        <Input
-                            id="confirmPassword"
-                            type="password"
-                            placeholder="••••••••"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                            disabled={isLoading}
-                            className="bg-background/50 border-input/50 focus:bg-background transition-colors"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="confirmPassword"
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                                disabled={isLoading}
+                                className="bg-background/50 border-input/50 focus:bg-background transition-colors pr-10"
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                tabIndex={-1}
+                            >
+                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
                     </div>
                 </CardContent>
 

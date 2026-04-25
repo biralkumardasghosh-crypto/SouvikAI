@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 import { useAdmin } from '@/hooks/useAdmin';
-import { Loader2, Shield } from 'lucide-react';
+import { Loader2, Shield, Eye, EyeOff } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useAdmin();
   const router = useRouter();
 
@@ -62,15 +63,26 @@ export default function AdminLoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="pr-10"
+                  />
+                  <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                  >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
