@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
+import { ADMIN_COOKIE_NAME, isAdminSessionValid } from '@/lib/admin-auth';
 
 async function checkAdminAuth() {
     const cookieStore = await cookies();
-    const session = cookieStore.get('admin_session');
-    return !!session?.value;
+    const session = cookieStore.get(ADMIN_COOKIE_NAME);
+    return isAdminSessionValid(session?.value);
 }
 
 export async function DELETE(

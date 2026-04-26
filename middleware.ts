@@ -1,13 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+import { ADMIN_COOKIE_NAME, isAdminSessionValid } from '@/lib/admin-auth';
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // Admin routes protection
+    // Admin routes protection — verify the cookie is a valid HMAC-signed
+    // session, not just that some cookie value is present.
     if (pathname.startsWith('/admin') && !pathname.startsWith('/adminlogin')) {
-        const adminSession = request.cookies.get('admin_session');
-        if (!adminSession?.value) {
+        const adminSession = request.cookies.get(ADMIN_COOKIE_NAME);
+        if (!(await isAdminSessionValid(adminSession?.value))) {
             return NextResponse.redirect(new URL('/adminlogin', request.url));
         }
     }

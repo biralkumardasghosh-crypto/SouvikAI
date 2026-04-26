@@ -52,24 +52,43 @@ function estimateTokens(text: string): number {
 
 export async function POST(request: NextRequest) {
     try {
-        // ── CSRF: reject requests that explicitly come from a different origin ──
-        // We only enforce when Origin is present and parseable. Same-origin
-        // browser fetches set Origin=<host>; server-to-server and some mobile
-        // clients omit it entirely — those are allowed through.
+        // ── CSRF: this is a cookie-authenticated, state-changing endpoint, so
+        // we require a same-origin browser request. We accept a request iff
+        // EITHER:
+        //   (a) the Origin header is present and matches Host, OR
+        //   (b) the Sec-Fetch-Site header is 'same-origin' (modern browsers
+        //       send this on every fetch — including cases where Origin is
+        //       suppressed, e.g. older same-origin GETs).
+        // Requests with no Origin AND no Sec-Fetch-Site are rejected: those
+        // are the shape `curl`/script attackers typically produce when riding
+        // a logged-in user's session token. There is no legitimate
+        // server-to-server caller for this route — auth is via Supabase
+        // cookies, which only browsers carry.
         const origin = request.headers.get('origin');
         const host   = request.headers.get('host');
+        const secFetchSite = request.headers.get('sec-fetch-site');
+
+        const normalise = (h: string) => h.replace(/:(?:80|443)$/, '');
+
+        let originOk = false;
         if (origin && host) {
             try {
-                const originHost = new URL(origin).host;
-                // Strip port for comparison when both sides use standard ports
-                const normalise = (h: string) => h.replace(/:(?:80|443)$/, '');
-                if (normalise(originHost) !== normalise(host)) {
-                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-                }
+                originOk = normalise(new URL(origin).host) === normalise(host);
             } catch {
-                // Malformed Origin — deny to be safe
-                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                originOk = false;
             }
+        }
+        const secFetchOk = secFetchSite === 'same-origin' || secFetchSite === 'none';
+
+        if (!originOk && !secFetchOk) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        // If Origin IS present but mismatched, reject even if Sec-Fetch-Site
+        // claims same-origin (defence in depth — Sec-Fetch-Site can be omitted
+        // by user-agents we don't recognise, but Origin can't be spoofed by
+        // browser JS).
+        if (origin && host && !originOk) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         const supabase = await createClient();
