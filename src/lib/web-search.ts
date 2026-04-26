@@ -1,6 +1,8 @@
 /**
  * web-search.ts
- * DuckDuckGo HTML scraper — zero external API keys required.
+ * Serper.dev (Google Search API) integration.
+ * Requires SERPER_API_KEY environment variable.
+ *
  * Called directly by the chat route; also exposed via /api/tools/web-search.
  */
 
@@ -16,70 +18,61 @@ export interface WebSearchResponse {
     results: WebSearchResult[];
 }
 
+interface SerperOrganicResult {
+    title?: string;
+    link?: string;
+    snippet?: string;
+}
+
+interface SerperResponse {
+    organic?: SerperOrganicResult[];
+}
+
+const SERPER_ENDPOINT = 'https://google.serper.dev/search';
+
 /**
- * Perform a web search via DuckDuckGo's HTML endpoint.
+ * Perform a web search via Serper.dev.
  * Returns up to `limit` results (default 5).
  */
 export async function searchWeb(
     query: string,
     limit = 5,
 ): Promise<WebSearchResponse> {
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const apiKey = process.env.SERPER_API_KEY;
 
-    const response = await fetch(searchUrl, {
+    if (!apiKey) {
+        console.error('[Web Search] SERPER_API_KEY is not set');
+        return { query, results: [] };
+    }
+
+    const response = await fetch(SERPER_ENDPOINT, {
+        method: 'POST',
         headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'X-API-KEY': apiKey,
+            'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+            q: query,
+            num: limit,
+        }),
         signal: AbortSignal.timeout(9_000),
     });
 
     if (!response.ok) {
-        throw new Error(`DuckDuckGo returned HTTP ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(
+            `Serper returned HTTP ${response.status}${errText ? `: ${errText}` : ''}`,
+        );
     }
 
-    const html = await response.text();
-    const results = parseResults(html, limit);
-    return { query, results };
-}
+    const data = (await response.json()) as SerperResponse;
+    const organic = Array.isArray(data.organic) ? data.organic : [];
 
-// ── Parsing ───────────────────────────────────────────────────────────────────
-
-function parseResults(html: string, limit: number): WebSearchResult[] {
     const results: WebSearchResult[] = [];
-
-    /**
-     * DuckDuckGo HTML structure (simplified):
-     *   <a class="result__a" href="//duckduckgo.com/l/?uddg=<encoded>&...">Title</a>
-     *   <a class="result__snippet" ...>Snippet…</a>
-     *
-     * We extract titles/URLs and snippets separately then pair them by index.
-     */
-    const titleRe =
-        /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-    const snippetRe =
-        /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-
-    const entries: { url: string; title: string }[] = [];
-    const snippets: string[] = [];
-
-    let m: RegExpExecArray | null;
-
-    while ((m = titleRe.exec(html)) !== null) {
-        const url = decodeDDGUrl(m[1]);
-        const title = stripHtml(m[2]);
-        if (url && title) entries.push({ url, title });
-    }
-
-    while ((m = snippetRe.exec(html)) !== null) {
-        snippets.push(stripHtml(m[1]));
-    }
-
-    for (let i = 0; i < Math.min(entries.length, limit); i++) {
-        const { url, title } = entries[i];
-        const snippet = snippets[i] ?? '';
+    for (const item of organic.slice(0, limit)) {
+        const url = item.link?.trim();
+        const title = item.title?.trim();
+        if (!url || !title) continue;
 
         let domain = '';
         try {
@@ -91,45 +84,12 @@ function parseResults(html: string, limit: number): WebSearchResult[] {
         results.push({
             title,
             url,
-            snippet,
+            snippet: (item.snippet ?? '').trim(),
             favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=16`,
         });
     }
 
-    return results;
-}
-
-/**
- * DuckDuckGo wraps outbound links:
- *   //duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com&rut=…
- * We decode the `uddg` param to get the real URL.
- */
-function decodeDDGUrl(raw: string): string | null {
-    try {
-        if (raw.includes('uddg=')) {
-            const full = raw.startsWith('//') ? `https:${raw}` : raw;
-            const uddg = new URL(full).searchParams.get('uddg');
-            return uddg ? decodeURIComponent(uddg) : null;
-        }
-        if (raw.startsWith('http')) return raw;
-        if (raw.startsWith('//')) return `https:${raw}`;
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-function stripHtml(html: string): string {
-    return html
-        .replace(/<[^>]+>/g, '')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#x27;/g, "'")
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return { query, results };
 }
 
 /**
