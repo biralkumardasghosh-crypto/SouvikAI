@@ -194,9 +194,9 @@ export function checkLoginRateLimit(ip: string): RateLimitResult {
 
     // Lazy GC so the map doesn't grow without bound on large attack surfaces.
     if (loginAttempts.size > 10_000) {
-        for (const [k, v] of loginAttempts) {
+        loginAttempts.forEach((v, k) => {
             if (v.resetAt < now) loginAttempts.delete(k);
-        }
+        });
     }
 
     const existing = loginAttempts.get(ip);
