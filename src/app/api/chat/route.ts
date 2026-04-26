@@ -276,15 +276,25 @@ export async function POST(request: NextRequest) {
             { role: 'user' as const, content: userContent },
         ];
 
-        // ── Web search tool instructions & context injection ────────
-        if (tool === 'searchWeb' && (!searchResults || searchResults.length === 0)) {
-            // Tell the model how to use the search tool
-            apiMessages[0].content += `\n\n[TOOL AVAILABLE: searchWeb]\nYou have the ability to search the web. If you need real-time data or up-to-date information to answer the user's prompt, output EXACTLY the following format and nothing else:\n<search>your search query</search>\n\nDo not include any other text. The system will intercept it, perform the search, and give you the results.`;
-        } else if (searchResults && searchResults.length > 0) {
-            // Client already performed the search, inject the results
+        // ── Web search context injection ─────────────────────────────────────
+        // The client performs the search BEFORE calling this route whenever the
+        // user clicks the "Search the web" tool, then forwards the results
+        // here. We never ask the model to decide whether/what to search via
+        // prompt-based <search> tags — that approach was unreliable (small
+        // models often ignored or malformed the tag, leading to no shimmer
+        // or empty result sets). The model is simply given grounded context
+        // and asked to answer.
+        if (Array.isArray(searchResults) && searchResults.length > 0) {
             apiMessages.splice(apiMessages.length - 1, 0, {
                 role: 'system' as const,
                 content: formatSearchContext(searchResultsQuery || 'Search', searchResults),
+            });
+        } else if (tool === 'searchWeb') {
+            // Search returned zero results — tell the model so it can be honest
+            // with the user instead of fabricating citations.
+            apiMessages.splice(apiMessages.length - 1, 0, {
+                role: 'system' as const,
+                content: formatSearchContext(searchResultsQuery || content, []),
             });
         }
 

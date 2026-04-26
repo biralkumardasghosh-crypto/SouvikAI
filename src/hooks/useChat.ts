@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getCachedSessionsPromise } from '@/lib/preload';
 import { Message, ChatSession, ChatState, AIModel } from '@/types/chat';
 import type { Attachment, AttachmentPayload } from '@/types/attachments';
+import type { WebSearchResult } from '@/lib/web-search';
 import { useAuth } from './useAuth';
 import { useChatPreferences } from './useChatPreferences';
 
@@ -291,7 +292,7 @@ export function useChat() {
                 personalizationBlock,
             ].filter(Boolean).join('\n\n');
 
-            const runCompletion = async (currentTool?: string, currentSearchResults?: any[], currentSearchQuery?: string) => {
+            const runCompletion = async (currentSearchResults?: any[], currentSearchQuery?: string) => {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -302,7 +303,10 @@ export function useChat() {
                         attachments: attachmentPayloads,
                         model: selectedModelIdRef.current === 'auto' ? 'souvik-ai-1' : selectedModelIdRef.current,
                         systemPrompt: customSystemPrompt,
-                        tool: currentTool,
+                        // We pass the original tool only so the server can record
+                        // an empty-results system message if the search came up
+                        // dry — we never let the model decide whether to search.
+                        tool: currentSearchResults ? 'searchWeb' : undefined,
                         searchResults: currentSearchResults,
                         searchResultsQuery: currentSearchQuery,
                     }),
@@ -319,63 +323,12 @@ export function useChat() {
 
                 const decoder = new TextDecoder();
                 let assistantContent = '';
-                let searchIntercepted = false;
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    assistantContent += chunk;
-
-                    // ── Client-side Tool Coordination ────────────────────────────────
-                    if (currentTool === 'searchWeb' && !currentSearchResults && !searchIntercepted) {
-                        if (assistantContent.includes('<search')) {
-                            const searchMatch = assistantContent.match(/<search>([\s\S]*?)<\/search>/);
-                            if (searchMatch) {
-                                searchIntercepted = true;
-                                const query = searchMatch[1].trim();
-                                
-                                // 1. Abort the current stream since we are pivoting to a search
-                                await reader.cancel();
-                                
-                                // 2. Flip UI to "Searching the web..." shimmer and clear the <search> tags
-                                setState((prev) => ({
-                                    ...prev,
-                                    messages: prev.messages.map((m) =>
-                                        m.id === assistantId
-                                            ? { ...m, content: '', webSearch: { query, status: 'searching', results: [] } }
-                                            : m
-                                    ),
-                                }));
-
-                                // 3. Perform the web search (client coordinates this so Vercel doesn't timeout)
-                                try {
-                                    const res = await fetch(`/api/tools/web-search?q=${encodeURIComponent(query)}`);
-                                    const data = await res.json();
-                                    
-                                    // 4. Update UI to "done" with source cards
-                                    setState((prev) => ({
-                                        ...prev,
-                                        messages: prev.messages.map((m) =>
-                                            m.id === assistantId
-                                                ? { ...m, webSearch: { query, status: 'done', results: data.results || [] } }
-                                                : m
-                                        ),
-                                    }));
-
-                                    // 5. Kick off a second request to the model with the search results
-                                    await runCompletion(undefined, data.results || [], query);
-                                } catch (e) {
-                                    console.error('[Chat] Search failed, falling back:', e);
-                                    await runCompletion(undefined, [], query);
-                                }
-                                return assistantContent; // Exit the stream reader
-                            }
-                            // Still streaming the <search> tag, don't show it to the user yet
-                            continue;
-                        }
-                    }
+                    assistantContent += decoder.decode(value);
 
                     setState((prev) => ({
                         ...prev,
@@ -384,11 +337,66 @@ export function useChat() {
                         ),
                     }));
                 }
-                
+
                 return assistantContent;
             };
 
-            const finalContent = await runCompletion(tool);
+            // ── Web search: run BEFORE calling the model ─────────────────────
+            // When the user clicks the "Search the web" tool we run the search
+            // up-front, show the shimmer immediately, and then make a single
+            // grounded LLM call. Previously we asked the model to decide
+            // whether to emit a <search>...</search> tag — small models
+            // ignored or malformed the tag, breaking the feature in two ways
+            // ("no shimmer at all" and "shimmer but zero sources").
+            let finalContent: string;
+            if (tool === 'searchWeb') {
+                // Tavily caps queries at ~400 chars. Trim to 300 to be safe;
+                // a focused query also tends to return better results.
+                const query = content.slice(0, 300).trim();
+
+                // 1. Show "Searching the web…" shimmer immediately.
+                setState((prev) => ({
+                    ...prev,
+                    messages: prev.messages.map((m) =>
+                        m.id === assistantId
+                            ? { ...m, content: '', webSearch: { query, status: 'searching', results: [] } }
+                            : m
+                    ),
+                }));
+
+                // 2. Run the search. Failures degrade to an empty result set —
+                //    the model is told the search came up empty and will say so.
+                let searchResults: WebSearchResult[] = [];
+                try {
+                    const res = await fetch(`/api/tools/web-search?q=${encodeURIComponent(query)}`, {
+                        signal: abortControllerRef.current?.signal,
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        searchResults = Array.isArray(data.results) ? data.results : [];
+                    }
+                } catch (e) {
+                    if ((e as Error).name !== 'AbortError') {
+                        console.error('[Chat] Web search failed:', e);
+                    }
+                }
+
+                // 3. Surface the source cards (or empty state) before the
+                //    grounded answer streams in.
+                setState((prev) => ({
+                    ...prev,
+                    messages: prev.messages.map((m) =>
+                        m.id === assistantId
+                            ? { ...m, webSearch: { query, status: 'done', results: searchResults } }
+                            : m
+                    ),
+                }));
+
+                // 4. Now ask the model, grounded in the results.
+                finalContent = await runCompletion(searchResults, query);
+            } else {
+                finalContent = await runCompletion();
+            }
 
             // Save assistant message using the final accumulated content
             await (supabase as any).from('chat_messages').insert({
