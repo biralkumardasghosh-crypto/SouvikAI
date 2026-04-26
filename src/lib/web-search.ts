@@ -7,8 +7,8 @@
  * caller is expected to degrade gracefully (the chat flow already does this).
  *
  * Provider order:
- *   1. Tavily   — needs TAVILY_API_KEY  (best quality for LLM grounding)
- *   2. Brave    — needs BRAVE_API_KEY   (independent index, generous free tier)
+ *   1. Brave    — needs BRAVE_API_KEY   (independent index, generous free tier)
+ *   2. Tavily   — needs TAVILY_API_KEY  (LLM-tuned snippets; good as a fallback)
  *   3. Serper   — needs SERPER_API_KEY  (Google results, paid)
  *   4. DuckDuckGo Instant Answer — no key, but only covers a narrow slice of
  *      queries (disambiguation pages, abstracts). Acts as a last-resort filler.
@@ -45,8 +45,8 @@ export async function searchWeb(
 ): Promise<WebSearchResponse> {
     const providers: Array<{ name: string; run: () => Promise<WebSearchResult[]> }> = [];
 
-    if (process.env.TAVILY_API_KEY) providers.push({ name: 'tavily', run: () => tavilySearch(query, limit) });
     if (process.env.BRAVE_API_KEY)  providers.push({ name: 'brave',  run: () => braveSearch(query, limit)  });
+    if (process.env.TAVILY_API_KEY) providers.push({ name: 'tavily', run: () => tavilySearch(query, limit) });
     if (process.env.SERPER_API_KEY) providers.push({ name: 'serper', run: () => serperSearch(query, limit) });
     // DDG IA is always available as a last resort; it's keyless.
     providers.push({ name: 'ddg-ia', run: () => duckDuckGoInstantAnswer(query, limit) });
