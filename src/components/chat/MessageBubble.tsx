@@ -154,7 +154,7 @@ export function MessageBubble({ message, isLoading, onRegenerate }: MessageBubbl
         'prose-tr:even:bg-muted/15',
     );
 
-    // ── Markdown component overrides — same for both roles ───────────────────
+    // ── Markdown component overrides — same for both roles ────��──────────────
     const markdownComponents = {
         // ── Inline + fenced code ──────────────────────────────────────────────
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -175,18 +175,18 @@ export function MessageBubble({ message, isLoading, onRegenerate }: MessageBubbl
             }
 
             return (
-                <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border/50 shadow-sm">
-                    <div className="flex items-center justify-between px-4 py-2 bg-[#1d1f21] border-b border-border/40">
-                        <span className="text-[11px] font-mono text-muted-foreground/70 uppercase tracking-widest select-none">
+                <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-2 bg-[#1d1f21] border-b border-[#2a2c2e]">
+                        <span className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest select-none">
                             {lang === 'text' ? 'plaintext' : lang}
                         </span>
                         <button
                             onClick={() => handleCopy(content)}
-                            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 transition-all"
+                            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-100/10 transition-all"
                             title="Copy code"
                         >
                             {copied === content ? (
-                                <><Check className="h-3 w-3 text-green-500" />Copied</>
+                                <><Check className="h-3 w-3 text-success" />Copied</>
                             ) : (
                                 <><Copy className="h-3 w-3" />Copy</>
                             )}

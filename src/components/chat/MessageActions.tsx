@@ -56,12 +56,12 @@ export function MessageActions({ content, onRegenerate, isLoading }: MessageActi
                 title={copied ? 'Copied!' : 'Copy response'}
                 className={cn(
                     'flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs',
-                    'text-muted-foreground hover:text-foreground',
-                    'hover:bg-white/5 transition-colors',
+                    'text-foreground-muted hover:text-foreground',
+                    'hover:bg-surface-2 transition-colors',
                 )}
             >
                 {copied
-                    ? <Check className="h-3.5 w-3.5 text-green-500" />
+                    ? <Check className="h-3.5 w-3.5 text-success" />
                     : <Copy className="h-3.5 w-3.5" />
                 }
                 <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -75,8 +75,8 @@ export function MessageActions({ content, onRegenerate, isLoading }: MessageActi
                     title="Regenerate response"
                     className={cn(
                         'flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs',
-                        'text-muted-foreground hover:text-foreground',
-                        'hover:bg-white/5 transition-colors',
+                        'text-foreground-muted hover:text-foreground',
+                        'hover:bg-surface-2 transition-colors',
                         (isLoading || regenPending) && 'opacity-40 cursor-not-allowed',
                     )}
                 >

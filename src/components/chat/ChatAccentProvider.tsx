@@ -57,7 +57,7 @@ export function ChatAccentProvider({ children }: ChatAccentProviderProps) {
 
     return (
         // data-chat-surface lets CSS selectors target this scope specifically.
-        <div ref={divRef} data-chat-surface className="flex h-screen bg-[#212121] overflow-hidden">
+        <div ref={divRef} data-chat-surface className="flex h-screen bg-background text-foreground overflow-hidden">
             {children}
         </div>
     );

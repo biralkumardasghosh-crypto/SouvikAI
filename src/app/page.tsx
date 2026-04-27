@@ -19,8 +19,8 @@ export default function ChatPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen flex items-center justify-center bg-[#212121]">
-                    <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+                <div className="min-h-screen flex items-center justify-center bg-background">
+                    <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
                 </div>
             }
         >
@@ -116,8 +116,8 @@ function ChatPageInner() {
 
     if (authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#212121]">
-                <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
             </div>
         );
     }
@@ -155,12 +155,12 @@ function ChatPageInner() {
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative z-10">
                 {/* Header */}
-                <header className="flex items-center justify-between px-2 md:px-3 py-2 bg-[#212121] sticky top-0 z-20">
+                <header className="flex items-center justify-between px-2 md:px-3 py-2 bg-background border-b border-border-subtle sticky top-0 z-20">
                     <div className="flex items-center gap-1">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/5"
+                            className="md:hidden h-9 w-9 text-foreground-muted hover:text-foreground hover:bg-surface-2"
                             onClick={() => setIsSidebarOpen(true)}
                         >
                             <Menu className="h-5 w-5" />
@@ -172,7 +172,7 @@ function ChatPageInner() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5"
+                            className="h-8 w-8 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-2"
                             title="Account"
                         >
                             <UserCircle className="h-5 w-5" />
@@ -180,7 +180,7 @@ function ChatPageInner() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5"
+                            className="h-8 w-8 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-2"
                             title="Notifications"
                         >
                             <Bell className="h-5 w-5" />

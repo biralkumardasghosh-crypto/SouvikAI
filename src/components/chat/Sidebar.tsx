@@ -171,10 +171,10 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                 className={cn(
                     'group relative flex items-center gap-1.5 pl-2 pr-1 h-8 rounded-md transition-colors duration-150 text-[13px]',
                     isRenaming
-                        ? 'bg-white/[0.08]'
+                        ? 'bg-surface-3'
                         : isActive
-                            ? 'bg-white/10 text-foreground cursor-pointer'
-                            : 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground cursor-pointer'
+                            ? 'bg-surface-3 text-foreground cursor-pointer'
+                            : 'text-foreground-muted hover:bg-surface-2 hover:text-foreground cursor-pointer'
                 )}
                 onClick={isRenaming ? undefined : onSelect}
             >
@@ -208,8 +208,8 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                         className={cn(
                             'shrink-0 h-6 w-6 flex items-center justify-center rounded transition-all',
                             menuOpen
-                                ? 'bg-white/15 text-foreground opacity-100'
-                                : 'text-muted-foreground/70 hover:bg-white/10 hover:text-foreground opacity-0 group-hover:opacity-100',
+                                ? 'bg-surface-3 text-foreground opacity-100'
+                                : 'text-foreground-subtle hover:bg-surface-3 hover:text-foreground opacity-0 group-hover:opacity-100',
                             isActive && 'opacity-100'
                         )}
                         title="Options"
@@ -223,11 +223,11 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                 <div
                     ref={menuRef}
                     style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
-                    className="min-w-[160px] bg-[#2a2a2a] rounded-lg border border-white/10 shadow-2xl py-1"
+                    className="min-w-[160px] bg-popover text-popover-foreground rounded-lg border border-border shadow-overlay py-1"
                 >
                     <button
                         onClick={(e) => { e.stopPropagation(); onPin(); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                     >
                         <Pin className="h-3.5 w-3.5 rotate-45" />
                         {session.isPinned ? 'Unpin' : 'Pin'}
@@ -235,7 +235,7 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                     {onRename && (
                         <button
                             onClick={(e) => { e.stopPropagation(); startRename(); setMenuOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                         >
                             <Pencil className="h-3.5 w-3.5" />
                             Rename
@@ -243,15 +243,15 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                     )}
                     <button
                         onClick={(e) => { e.stopPropagation(); onArchive(); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                     >
                         <Archive className="h-3.5 w-3.5" />
                         Archive
                     </button>
-                    <div className="my-1 h-px bg-white/10" />
+                    <div className="my-1 h-px bg-border-subtle" />
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-destructive hover:bg-destructive/10 transition-colors"
                     >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
@@ -266,7 +266,7 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
 function BrandMark({ withWordmark = true }: { withWordmark?: boolean }) {
     return (
         <div className="flex items-center gap-2 text-foreground">
-            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center">
+            <div className="h-6 w-6 rounded-md bg-foreground text-background flex items-center justify-center">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2C6.477 2 2 6.27 2 11.5c0 2.37.93 4.53 2.46 6.14L3 21.75l4.45-1.45A10.1 10.1 0 0 0 12 21c5.523 0 10-4.27 10-9.5S17.523 2 12 2Z" fill="currentColor" />
                 </svg>
@@ -340,8 +340,8 @@ export function Sidebar({
 
             {/* ── Mobile sidebar drawer ── */}
             {isMobileOpen && (
-                <div className="sidebar-drawer md:hidden w-[256px] bg-[#171717] flex flex-col h-full safe-top safe-bottom">
-                    <div className="flex items-center justify-between px-3 h-12 border-b border-white/[0.06]">
+                <div className="sidebar-drawer md:hidden w-[256px] bg-surface text-foreground border-r border-border flex flex-col h-full safe-top safe-bottom">
+                    <div className="flex items-center justify-between px-3 h-12 border-b border-border-subtle">
                         <BrandMark />
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onMobileClose}>
                             <X className="h-4 w-4" />
@@ -355,12 +355,12 @@ export function Sidebar({
                                 <button
                                     key={item.action}
                                     onClick={item.action === 'new-chat' ? onNewChat : item.action === 'search' ? onSearch : undefined}
-                                    className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                                    className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                                 >
                                     <Icon className="h-4 w-4 shrink-0" />
                                     <span className="flex-1 text-left">{item.label}</span>
                                     {item.shortcut && (
-                                        <kbd className="text-[10px] font-mono text-muted-foreground/50 bg-white/5 border border-white/10 rounded px-1 py-0.5">
+                                        <kbd className="text-[10px] font-mono text-foreground-subtle bg-surface-2 border border-border rounded px-1 py-0.5">
                                             {item.shortcut}
                                         </kbd>
                                     )}
@@ -369,7 +369,7 @@ export function Sidebar({
                         })}
                     </nav>
 
-                    <div className="h-px bg-white/[0.06] mx-2" />
+                    <div className="h-px bg-border-subtle mx-2" />
 
                     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 py-2">
                         <nav className="space-y-0.5 mb-3">
@@ -378,7 +378,7 @@ export function Sidebar({
                                 return (
                                     <button
                                         key={item.action}
-                                        className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                                        className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
                                         <span className="flex-1 text-left">{item.label}</span>
@@ -389,7 +389,7 @@ export function Sidebar({
 
                         {groups.map((group) => (
                             <div key={group.label} className="mb-3 last:mb-0">
-                                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">
                                     {group.label}
                                 </div>
                                 <div className="space-y-0.5">
@@ -399,15 +399,15 @@ export function Sidebar({
                                             className={cn(
                                                 'flex items-center gap-2 px-2 h-9 rounded-md cursor-pointer transition-colors text-[13px]',
                                                 currentSessionId === session.id
-                                                    ? 'bg-white/10 text-foreground'
-                                                    : 'hover:bg-white/[0.06] text-muted-foreground hover:text-foreground'
+                                                    ? 'bg-surface-3 text-foreground'
+                                                    : 'hover:bg-surface-2 text-foreground-muted hover:text-foreground'
                                             )}
                                             onClick={() => onSelectSession(session.id)}
                                         >
                                             {session.isPinned ? (
-                                                <Pin className="h-3 w-3 shrink-0 text-muted-foreground/60 rotate-45" />
+                                                <Pin className="h-3 w-3 shrink-0 text-foreground-subtle rotate-45" />
                                             ) : (
-                                                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+                                                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-foreground-subtle" />
                                             )}
                                             <span className="flex-1 truncate">{session.title}</span>
                                         </div>
@@ -417,19 +417,19 @@ export function Sidebar({
                         ))}
                     </div>
 
-                    <div className="h-px bg-white/[0.06] mx-2" />
+                    <div className="h-px bg-border-subtle mx-2" />
 
                     <div className="px-2 py-1.5">
                         <button
                             onClick={goToAllChats}
-                            className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                            className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                         >
                             <LayoutList className="h-4 w-4 shrink-0" />
                             <span className="flex-1 text-left">View all chats</span>
                         </button>
                     </div>
 
-                    <div className="h-px bg-white/[0.06] mx-2" />
+                    <div className="h-px bg-border-subtle mx-2" />
 
                     <div className="p-2">
                         <UserMenu
@@ -449,7 +449,7 @@ export function Sidebar({
                 className="hidden md:block md:relative md:flex-shrink-0 h-full transition-[width] duration-200 ease-out"
                 style={{ width: isCollapsed ? COLLAPSED_WIDTH : sidebarWidth }}
             >
-                <div className="flex flex-col w-full h-full bg-[#171717] border-r border-white/[0.06] overflow-hidden">
+                <div className="flex flex-col w-full h-full bg-surface text-foreground border-r border-border overflow-hidden">
 
                     {/* ── Header: brand + collapse toggle ── */}
                     <div
@@ -463,7 +463,7 @@ export function Sidebar({
                         </div>
                         <button
                             onClick={() => setIsCollapsed(!isCollapsed)}
-                            className="text-muted-foreground hover:text-foreground transition-colors h-7 w-7 flex items-center justify-center rounded-md hover:bg-white/[0.06]"
+                            className="text-foreground-muted hover:text-foreground transition-colors h-7 w-7 flex items-center justify-center rounded-md hover:bg-surface-2"
                             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         >
                             {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -483,7 +483,7 @@ export function Sidebar({
                                     key={item.action}
                                     onClick={handler}
                                     className={cn(
-                                        'w-full flex items-center text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors duration-150 rounded-md',
+                                        'w-full flex items-center text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors duration-150 rounded-md',
                                         isCollapsed
                                             ? 'h-8 w-8 mx-auto justify-center'
                                             : 'gap-2.5 px-2 h-8'
@@ -495,7 +495,7 @@ export function Sidebar({
                                         <>
                                             <span className="flex-1 text-left">{item.label}</span>
                                             {isSearch && (
-                                                <kbd className="text-[10px] font-mono text-muted-foreground/50 bg-white/5 border border-white/10 rounded px-1 py-px">
+                                                <kbd className="text-[10px] font-mono text-foreground-subtle bg-surface-2 border border-border rounded px-1 py-px">
                                                     ⌘K
                                                 </kbd>
                                             )}
@@ -521,7 +521,7 @@ export function Sidebar({
                                     <button
                                         key={item.action}
                                         className={cn(
-                                            'w-full flex items-center text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors duration-150 rounded-md',
+                                            'w-full flex items-center text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors duration-150 rounded-md',
                                             isCollapsed
                                                 ? 'h-8 w-8 mx-auto justify-center'
                                                 : 'gap-2.5 px-2 h-8'
@@ -541,7 +541,7 @@ export function Sidebar({
                             <div className="px-2 pb-2">
                                 {groups.map((group) => (
                                     <div key={group.label} className="mb-3 last:mb-1">
-                                        <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                                        <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">
                                             {group.label}
                                         </div>
                                         <div className="space-y-px">
@@ -565,8 +565,8 @@ export function Sidebar({
 
                         {!isCollapsed && groups.length === 0 && (
                             <div className="px-4 py-6 text-center">
-                                <p className="text-[12px] text-muted-foreground/60">No chats yet</p>
-                                <p className="text-[11px] text-muted-foreground/40 mt-0.5">Start a new chat to begin</p>
+                                <p className="text-[12px] text-foreground-muted">No chats yet</p>
+                                <p className="text-[11px] text-foreground-subtle mt-0.5">Start a new chat to begin</p>
                             </div>
                         )}
 
@@ -578,8 +578,8 @@ export function Sidebar({
                                         className={cn(
                                             'w-8 h-8 mx-auto flex items-center justify-center rounded-md cursor-pointer transition-colors',
                                             currentSessionId === session.id
-                                                ? 'bg-white/10 text-foreground'
-                                                : 'hover:bg-white/[0.06] text-muted-foreground hover:text-foreground'
+                                                ? 'bg-surface-3 text-foreground'
+                                                : 'hover:bg-surface-2 text-foreground-muted hover:text-foreground'
                                         )}
                                         onClick={() => onSelectSession(session.id)}
                                         title={session.title}
@@ -596,12 +596,12 @@ export function Sidebar({
                     </div>
 
                     {/* ── View all chats ── */}
-                    <div className={cn('shrink-0 border-t border-white/[0.06]', isCollapsed ? 'p-1.5' : 'px-2 py-1.5')}>
+                    <div className={cn('shrink-0 border-t border-border-subtle', isCollapsed ? 'p-1.5' : 'px-2 py-1.5')}>
                         <button
                             onClick={goToAllChats}
                             title={isCollapsed ? 'View all chats' : undefined}
                             className={cn(
-                                'w-full flex items-center text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors duration-150 rounded-md',
+                                'w-full flex items-center text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors duration-150 rounded-md',
                                 isCollapsed
                                     ? 'h-8 w-8 mx-auto justify-center'
                                     : 'gap-2.5 px-2 h-8'
@@ -615,7 +615,7 @@ export function Sidebar({
                     </div>
 
                     {/* ── Footer: user menu ── */}
-                    <div className={cn('shrink-0 border-t border-white/[0.06]', isCollapsed ? 'p-1.5' : 'p-2')}>
+                    <div className={cn('shrink-0 border-t border-border-subtle', isCollapsed ? 'p-1.5' : 'p-2')}>
                         <UserMenu
                             user={user}
                             displayName={displayName}
@@ -633,7 +633,7 @@ export function Sidebar({
                         onMouseDown={startDrag}
                         className={cn(
                             'absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-40 transition-colors',
-                            isDragging ? 'bg-blue-500/60' : 'hover:bg-blue-500/30'
+                            isDragging ? 'bg-ring/60' : 'hover:bg-ring/30'
                         )}
                         title="Drag to resize"
                     />
@@ -661,26 +661,26 @@ function UserMenu({ user, displayName, initial, collapsed, onOpenSettings, onSig
             <DropdownMenuTrigger asChild>
                 <button
                     className={cn(
-                        'w-full flex items-center rounded-md hover:bg-white/[0.06] transition-colors text-left',
+                        'w-full flex items-center rounded-md hover:bg-surface-2 transition-colors text-left',
                         collapsed ? 'h-8 w-8 mx-auto justify-center p-0' : 'gap-2 px-1.5 py-1.5'
                     )}
                     title={collapsed ? displayName : undefined}
                 >
-                    <Avatar className="h-7 w-7 shrink-0 ring-1 ring-white/10">
-                        <AvatarFallback className="bg-gradient-to-br from-[#5a5a5a] to-[#3a3a3a] text-white text-[11px] font-semibold">
+                    <Avatar className="h-7 w-7 shrink-0 ring-1 ring-border">
+                        <AvatarFallback className="bg-foreground text-background text-[11px] font-semibold">
                             {initial}
                         </AvatarFallback>
                     </Avatar>
                     {!collapsed && (
                         <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-medium truncate text-foreground leading-tight">{displayName}</p>
-                            <p className="text-[11px] text-muted-foreground truncate leading-tight">Free plan</p>
+                            <p className="text-[11px] text-foreground-muted truncate leading-tight">Free plan</p>
                         </div>
                     )}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 bg-[#2a2a2a] border-white/10" sideOffset={8}>
-                <div className="px-2 py-1.5 text-[11px] text-muted-foreground border-b border-white/10 mb-1 truncate">
+            <DropdownMenuContent align="start" className="w-56 bg-popover text-popover-foreground border-border" sideOffset={8}>
+                <div className="px-2 py-1.5 text-[11px] text-foreground-muted border-b border-border-subtle mb-1 truncate">
                     {user?.email}
                 </div>
                 <DropdownMenuItem

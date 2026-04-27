@@ -22,7 +22,7 @@ const TooltipContent = React.forwardRef<React.ElementRef<typeof TooltipPrimitive
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
-const PopoverContent = React.forwardRef<React.ElementRef<typeof PopoverPrimitive.Content>, React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>>(({ className, align = "center", sideOffset = 4, ...props }, ref) => ( <PopoverPrimitive.Portal><PopoverPrimitive.Content ref={ref} align={align} sideOffset={sideOffset} className={cn("z-50 w-64 rounded-xl bg-popover dark:bg-[#303030] p-2 text-popover-foreground dark:text-white shadow-md outline-none animate-in data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", className)} {...props} /></PopoverPrimitive.Portal>));
+const PopoverContent = React.forwardRef<React.ElementRef<typeof PopoverPrimitive.Content>, React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>>(({ className, align = "center", sideOffset = 4, ...props }, ref) => ( <PopoverPrimitive.Portal><PopoverPrimitive.Content ref={ref} align={align} sideOffset={sideOffset} className={cn("z-50 w-64 rounded-xl bg-popover border border-border p-2 text-popover-foreground shadow-overlay outline-none animate-in data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", className)} {...props} /></PopoverPrimitive.Portal>));
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 // --- SVG Icon Components ---
@@ -175,7 +175,7 @@ export function ChatInput({
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className="relative flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-white border dark:bg-[#303030] dark:border-transparent cursor-text"
+                    className="relative flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-surface border border-border cursor-text"
                 >
                     <DragDropOverlay visible={isDragging} />
 
@@ -242,7 +242,7 @@ export function ChatInput({
                         onPaste={handlePaste}
                         placeholder="Ask anything, drop a file, or paste an image..." 
                         disabled={isLoading || disabled}
-                        className="custom-scrollbar w-full resize-none border-0 bg-transparent p-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-300 focus:ring-0 focus-visible:outline-none min-h-12" 
+                        className="custom-scrollbar w-full resize-none border-0 bg-transparent p-3 text-foreground placeholder:text-foreground-subtle focus:ring-0 focus-visible:outline-none min-h-12" 
                     />
                     
                     <div className="mt-0.5 p-1 pt-0">
@@ -250,7 +250,7 @@ export function ChatInput({
                         <div className="flex items-center gap-2">
                         <Tooltip> 
                             <TooltipTrigger asChild>
-                                <button type="button" onClick={handlePlusClick} disabled={isLoading || disabled} className="flex h-8 w-8 items-center justify-center rounded-full text-foreground dark:text-white transition-colors hover:bg-accent dark:hover:bg-[#515151] focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button type="button" onClick={handlePlusClick} disabled={isLoading || disabled} className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                                     <PlusIcon className="h-6 w-6" />
                                     <span className="sr-only">Attach file</span>
                                 </button>
@@ -262,7 +262,7 @@ export function ChatInput({
                             <Tooltip>
                             <TooltipTrigger asChild>
                                 <PopoverTrigger asChild>
-                                <button type="button" disabled={isLoading || disabled} className="flex h-8 items-center gap-2 rounded-full p-2 text-sm text-foreground dark:text-white transition-colors hover:bg-accent dark:hover:bg-[#515151] focus-visible:outline-none focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button type="button" disabled={isLoading || disabled} className="flex h-8 items-center gap-2 rounded-full p-2 text-sm text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed">
                                     <Settings2Icon className="h-4 w-4" />
                                     {!selectedTool && 'Tools'}
                                 </button>
@@ -273,10 +273,10 @@ export function ChatInput({
                             <PopoverContent side="top" align="start">
                             <div className="flex flex-col gap-1">
                                 {toolsList.map(tool => ( 
-                                    <button key={tool.id} onClick={() => { setSelectedTool(tool.id); setIsPopoverOpen(false); }} className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-accent dark:hover:bg-[#515151]"> 
+                                    <button key={tool.id} onClick={() => { setSelectedTool(tool.id); setIsPopoverOpen(false); }} className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-popover-foreground hover:bg-surface-2"> 
                                         <tool.icon className="h-4 w-4" /> 
                                         <span>{tool.name}</span> 
-                                        {tool.extra && <span className="ml-auto text-xs text-muted-foreground dark:text-gray-400">{tool.extra}</span>} 
+                                        {tool.extra && <span className="ml-auto text-xs text-foreground-subtle">{tool.extra}</span>} 
                                     </button> 
                                 ))}
                             </div>
@@ -285,8 +285,8 @@ export function ChatInput({
 
                         {activeTool && (
                             <>
-                            <div className="h-4 w-px bg-border dark:bg-gray-600" />
-                            <button onClick={() => setSelectedTool(null)} className="flex h-8 items-center gap-2 rounded-full px-2 text-sm dark:hover:bg-[#3b4045] hover:bg-accent cursor-pointer dark:text-[#99ceff] text-[#2294ff] transition-colors flex-row items-center justify-center">
+                            <div className="h-4 w-px bg-border" />
+                            <button onClick={() => setSelectedTool(null)} className="flex h-8 items-center gap-2 rounded-full px-2 text-sm hover:bg-surface-2 cursor-pointer text-brand transition-colors flex-row items-center justify-center">
                                 {ActiveToolIcon && <ActiveToolIcon className="h-4 w-4" />}
                                 {activeTool.shortName}
                                 <XIcon className="h-4 w-4" />
@@ -297,7 +297,7 @@ export function ChatInput({
                         <div className="ml-auto flex items-center gap-2">
                             <Tooltip>
                             <TooltipTrigger asChild>
-                                <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-full text-foreground dark:text-white transition-colors hover:bg-accent dark:hover:bg-[#515151] focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                                 <MicIcon className="h-5 w-5" />
                                 <span className="sr-only">Record voice</span>
                                 </button>
@@ -311,7 +311,7 @@ export function ChatInput({
                                         <Button
                                             onClick={onStop}
                                             size="icon"
-                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/85"
                                         >
                                             <Square className="h-3 w-3 fill-current" />
                                         </Button>
@@ -321,7 +321,7 @@ export function ChatInput({
                             ) : isProcessing ? (
                                 <button
                                     disabled
-                                    className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-[#4a4a4a] text-muted-foreground cursor-default"
+                                    className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-surface-3 text-foreground-muted cursor-default"
                                     title="Processing attachment…"
                                 >
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -333,7 +333,7 @@ export function ChatInput({
                                         type="button" 
                                         onClick={handleSubmit}
                                         disabled={!canSend} 
-                                        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 disabled:bg-black/40 dark:disabled:bg-[#515151]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none bg-foreground text-background hover:bg-foreground/85 disabled:bg-surface-3 disabled:text-foreground-subtle"
                                     >
                                     <SendIcon className="h-6 w-6 text-bold" />
                                     <span className="sr-only">Send message</span>
@@ -348,7 +348,7 @@ export function ChatInput({
                     </div>
                 </div>
                 
-                <p className="text-[11px] text-muted-foreground/50 text-center mt-2 font-medium">
+                <p className="text-[11px] text-foreground-subtle text-center mt-2 font-medium">
                     SouvikAI can make mistakes. Consider checking important information.
                 </p>
             </div>
