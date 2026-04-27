@@ -259,13 +259,31 @@ export async function POST(request: NextRequest) {
 
         // ── Web search tool instructions & context injection ────────
         if (tool === 'searchWeb' && (!searchResults || searchResults.length === 0)) {
-            // Tell the model how to use the search tool
-            apiMessages[0].content += `\n\n[TOOL AVAILABLE: searchWeb]\nYou have the ability to search the web. If you need real-time data or up-to-date information to answer the user's prompt, output EXACTLY the following format and nothing else:\n<search>your search query</search>\n\nDo not include any other text. The system will intercept it, perform the search, and give you the results.`;
+            // First pass: tell the model how to invoke the search tool. The
+            // example below is illustrative — the model MUST replace the
+            // example keywords with keywords derived from the user's request.
+            apiMessages[0].content += [
+                '',
+                '',
+                '[TOOL AVAILABLE: searchWeb]',
+                "You can search the web for real-time or up-to-date information. To do so, output ONE line containing ONLY a <search> tag whose contents are concise search keywords derived from the user's request. Do NOT include any other text, explanation, or <think> block — just the tag.",
+                '',
+                'Format:  <search>KEYWORDS</search>',
+                'Example: if the user asks "what is the latest version of Next.js?", you must output exactly:',
+                '<search>latest Next.js version</search>',
+                '',
+                'Replace the keywords with what is actually relevant to the user\'s prompt. Never output the literal placeholder text "KEYWORDS" or "your search query".',
+            ].join('\n');
         } else if (searchResults && searchResults.length > 0) {
-            // Client already performed the search, inject the results
+            // Second pass: the client has already run the search. Inject the
+            // results AND forbid the model from emitting another <search> tag —
+            // otherwise it can recurse and the raw tag leaks into the visible
+            // answer.
             apiMessages.splice(apiMessages.length - 1, 0, {
                 role: 'system' as const,
-                content: formatSearchContext(searchResultsQuery || 'Search', searchResults),
+                content:
+                    formatSearchContext(searchResultsQuery || 'Search', searchResults) +
+                    '\n\nIMPORTANT: The web search has already been performed. Do NOT emit another <search> tag under any circumstances. Answer the user using the results above and cite sources like [1], [2].',
             });
         }
 

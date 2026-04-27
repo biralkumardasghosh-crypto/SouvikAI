@@ -133,9 +133,13 @@ export function ThinkingTimeline({
                     open && hasBody ? 'max-h-[1400px] opacity-100 mt-2' : 'max-h-0 opacity-0',
                 )}
             >
-                <div className="relative pl-7">
-                    {/* Vertical connector line */}
-                    <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/50" />
+                <div className="relative">
+                    {/*
+                      Vertical connector line. The icon column below is 18px
+                      wide, so the line sits at x=9 (its centre) and is
+                      perfectly centred behind every icon.
+                    */}
+                    <div className="absolute left-[9px] top-3 bottom-3 w-px bg-border/60" aria-hidden />
 
                     {/* Search step (always above thinking when present) */}
                     {webSearch && (
@@ -180,9 +184,14 @@ function TimelineRow({
     last?: boolean;
 }) {
     return (
-        <div className={cn('relative flex items-start gap-3', last ? 'mb-0' : 'mb-3')}>
-            {/* Icon sits on top of the connector line, masked by the page bg. */}
-            <span className="absolute -left-[19px] top-0.5 h-5 w-5 rounded-full bg-background flex items-center justify-center text-muted-foreground/70">
+        <div className={cn('relative flex items-start gap-2.5', last ? 'mb-0' : 'mb-3')}>
+            {/*
+              Fixed-width icon column (18px). The connector line behind these
+              icons is at x=9, so a 3.5×3.5 lucide icon centred in this box
+              ends up perfectly aligned with the line. The bg-background
+              "masks" the line so it appears to thread between the icons.
+            */}
+            <span className="relative z-10 flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-background text-muted-foreground/70 mt-0.5">
                 {icon}
             </span>
             <div className="flex-1 min-w-0">{children}</div>

@@ -378,15 +378,26 @@ export function useChat() {
                         }
                     }
 
+                    // Safety net: strip any <search>…</search> tags the model
+                    // may emit on the second pass (after we've already run the
+                    // search). Without this, the raw tag leaks into the
+                    // visible answer and gets persisted to the DB.
+                    const visibleContent = assistantContent.replace(
+                        /<search>[\s\S]*?<\/search>/gi,
+                        ''
+                    );
+
                     setState((prev) => ({
                         ...prev,
                         messages: prev.messages.map((m) =>
-                            m.id === assistantId ? { ...m, content: assistantContent } : m
+                            m.id === assistantId ? { ...m, content: visibleContent } : m
                         ),
                     }));
                 }
-                
-                return assistantContent;
+
+                // Return the cleaned content so the DB save and the outer
+                // caller never see the placeholder tag.
+                return assistantContent.replace(/<search>[\s\S]*?<\/search>/gi, '').trim();
             };
 
             const finalContent = await runCompletion(tool);
