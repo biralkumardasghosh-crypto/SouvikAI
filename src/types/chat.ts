@@ -12,6 +12,8 @@ export interface WebSearchState {
     results: WebSearchResult[];
 }
 
+import type { MessageAttachment } from './attachments';
+
 export interface Message {
     id: string;
     sessionId: string;
@@ -21,6 +23,8 @@ export interface Message {
     createdAt: Date;
     /** Present on assistant messages when the searchWeb tool was used. */
     webSearch?: WebSearchState;
+    /** Present on user messages with files attached — used to render previews in the bubble. */
+    attachments?: MessageAttachment[];
 }
 
 export interface ChatSession {

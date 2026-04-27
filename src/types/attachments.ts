@@ -19,6 +19,8 @@ export interface Attachment {
     sizeBytes: number;
     /** Option A — full base64 data-URL, e.g. "data:image/png;base64,..." */
     base64?: string;
+    /** Option A — small (~10–50 KB) data-URL preview used for UI tiles and history. */
+    thumbnail?: string;
     /** Option B — plain text extracted from the document. */
     extractedText?: string;
 }
@@ -28,3 +30,19 @@ export interface Attachment {
  * We strip fields that are only needed in the UI (name, sizeBytes).
  */
 export type AttachmentPayload = Pick<Attachment, 'kind' | 'mimeType' | 'base64' | 'extractedText' | 'name'>;
+
+/**
+ * Persisted attachment metadata stored on chat_messages.attachments (JSONB).
+ *
+ * We never persist the full base64 — only the lightweight thumbnail (for images)
+ * and the metadata needed to re-render a message bubble. Document text is also
+ * dropped because it was already injected into the message content at send time.
+ */
+export interface MessageAttachment {
+    kind: AttachmentKind;
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    /** Image thumbnail data-URL — present for images only. */
+    thumbnail?: string;
+}

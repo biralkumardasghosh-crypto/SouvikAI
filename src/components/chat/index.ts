@@ -9,3 +9,7 @@ export { SearchModal } from './SearchModal';
 export { ConfirmModal } from './ConfirmModal';
 export { QuotaBanner } from './QuotaBanner';
 export { WebSearchIndicator } from './WebSearchIndicator';
+export { AttachmentPreview } from './AttachmentPreview';
+export { ImageLightbox } from './ImageLightbox';
+export { DragDropOverlay } from './DragDropOverlay';
+export { MessageAttachments } from './MessageAttachments';

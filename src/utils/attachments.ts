@@ -8,6 +8,7 @@
  */
 
 import type { Attachment } from '@/types/attachments';
+import { generateThumbnail } from './thumbnail';
 
 /** File types we accept for Option A (images). */
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp';
@@ -84,7 +85,15 @@ export async function processFile(file: File): Promise<Attachment> {
             throw new Error(`"${file.name}" is too large. Images must be under 5 MB.`);
         }
         const base64 = await readAsBase64(file);
-        return { id, name: file.name, kind: 'image', mimeType: file.type, sizeBytes: file.size, base64 };
+        // Thumbnail generation is best-effort — fall back to the full base64 if
+        // the canvas pipeline can't produce a smaller preview.
+        let thumbnail = base64;
+        try {
+            thumbnail = await generateThumbnail(base64);
+        } catch {
+            // ignore
+        }
+        return { id, name: file.name, kind: 'image', mimeType: file.type, sizeBytes: file.size, base64, thumbnail };
     }
 
     // ── PDFs (Option B via PDF.js) ─────────────────────────────────────────────

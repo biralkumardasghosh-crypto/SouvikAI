@@ -5,7 +5,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getCachedSessionsPromise } from '@/lib/preload';
 import { Message, ChatSession, ChatState, AIModel } from '@/types/chat';
-import type { Attachment, AttachmentPayload } from '@/types/attachments';
+import type { Attachment, AttachmentPayload, MessageAttachment } from '@/types/attachments';
 import { useAuth } from './useAuth';
 import { useChatPreferences } from './useChatPreferences';
 
@@ -103,6 +103,7 @@ export function useChat() {
                 role: m.role,
                 content: m.content,
                 createdAt: new Date(m.created_at),
+                attachments: Array.isArray(m.attachments) ? (m.attachments as MessageAttachment[]) : undefined,
             }));
             setState((prev) => ({ ...prev, messages, currentSessionId: sessionId }));
         }
@@ -177,19 +178,20 @@ export function useChat() {
             return;
         }
 
-        // Build a user-visible content string that includes document context
-        const docSummary = attachments
-            .filter((a) => a.kind === 'document')
-            .map((a) => `📄 ${a.name}`)
-            .join(', ');
-        const imgSummary = attachments
-            .filter((a) => a.kind === 'image')
-            .map((a) => `🖼️ ${a.name}`)
-            .join(', ');
-        const attachmentLabel = [imgSummary, docSummary].filter(Boolean).join('  ');
-        const displayContent  = attachmentLabel ? `${content}\n\n${attachmentLabel}` : content;
+        // Slim metadata persisted alongside the message — used to render
+        // image previews and document chips inside the bubble. We deliberately
+        // drop the full base64 (heavy) and extracted text (already merged into
+        // `content` server-side) to keep DB rows lean.
+        const messageAttachments: MessageAttachment[] = attachments.map((a) => ({
+            kind: a.kind,
+            name: a.name,
+            mimeType: a.mimeType,
+            sizeBytes: a.sizeBytes,
+            thumbnail: a.kind === 'image' ? a.thumbnail || a.base64 : undefined,
+        }));
 
-        // Strip heavy base64/text from the displayed message — keep only the label
+        // Heavy version sent in the API request — full base64 for vision and
+        // extracted text for documents.
         const attachmentPayloads: AttachmentPayload[] = attachments.map(({ kind, mimeType, base64, extractedText, name }) => ({
             kind, mimeType, base64, extractedText, name,
         }));
@@ -200,14 +202,16 @@ export function useChat() {
             if (!sessionId) return;
         }
 
-        // Add user message — display text includes attachment labels
+        // Add user message — clean content (no emoji prefix); attachments render
+        // as real previews via MessageAttachments inside the bubble.
         const userMessage: Message = {
             id: crypto.randomUUID(),
             sessionId,
             userId: user.id,
             role: 'user',
-            content: displayContent,
+            content,
             createdAt: new Date(),
+            attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
         };
 
         setState((prev) => ({
@@ -224,6 +228,7 @@ export function useChat() {
             user_id: user.id,
             role: 'user',
             content,
+            attachments: messageAttachments.length > 0 ? messageAttachments : null,
         }).then(({ error }: any) => {
             if (error) console.error('Failed to save message:', error);
         });
