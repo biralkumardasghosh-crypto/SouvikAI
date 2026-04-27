@@ -51,9 +51,14 @@ interface SidebarProps {
     onMobileClose?: () => void;
 }
 
-const NAV_ITEMS = [
+// Stays pinned above the scrollable chat list.
+const STICKY_NAV_ITEMS = [
     { icon: Plus, label: 'New chat', action: 'new-chat' as const },
     { icon: Search, label: 'Search chats', action: 'search' as const, shortcut: '⌘K' },
+];
+
+// Lives inside the scrollable region — scrolls together with the chat list.
+const SCROLLABLE_NAV_ITEMS = [
     { icon: ImageIcon, label: 'Images', action: 'images' as const },
     { icon: Grid2X2, label: 'Apps', action: 'apps' as const },
     { icon: Code2, label: 'Codex', action: 'codex' as const },
@@ -343,8 +348,8 @@ export function Sidebar({
                         </Button>
                     </div>
 
-                    <nav className="px-2 py-2 space-y-0.5">
-                        {NAV_ITEMS.map((item) => {
+                    <nav className="px-2 py-2 space-y-0.5 shrink-0">
+                        {STICKY_NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
                             return (
                                 <button
@@ -367,6 +372,21 @@ export function Sidebar({
                     <div className="h-px bg-white/[0.06] mx-2" />
 
                     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 py-2">
+                        <nav className="space-y-0.5 mb-3">
+                            {SCROLLABLE_NAV_ITEMS.map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                    <button
+                                        key={item.action}
+                                        className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                                    >
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        <span className="flex-1 text-left">{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
                         {groups.map((group) => (
                             <div key={group.label} className="mb-3 last:mb-0">
                                 <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
@@ -450,9 +470,9 @@ export function Sidebar({
                         </button>
                     </div>
 
-                    {/* ── Primary nav ── */}
-                    <nav className={cn('px-2 space-y-0.5', isCollapsed && 'px-1.5')}>
-                        {NAV_ITEMS.map((item) => {
+                    {/* ── Sticky primary nav (always pinned above chat list) ── */}
+                    <nav className={cn('px-2 space-y-0.5 shrink-0', isCollapsed && 'px-1.5')}>
+                        {STICKY_NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
                             const isNewChat = item.action === 'new-chat';
                             const isSearch = item.action === 'search';
@@ -486,8 +506,37 @@ export function Sidebar({
                         })}
                     </nav>
 
-                    {/* ── Chats section ── */}
+                    {/* ── Chats section (scrollable: secondary nav + chat groups) ── */}
                     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden mt-2">
+                        {/* Secondary nav scrolls along with the chat list */}
+                        <nav
+                            className={cn(
+                                'space-y-0.5',
+                                isCollapsed ? 'px-1.5 pb-2' : 'px-2 pb-2'
+                            )}
+                        >
+                            {SCROLLABLE_NAV_ITEMS.map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                    <button
+                                        key={item.action}
+                                        className={cn(
+                                            'w-full flex items-center text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors duration-150 rounded-md',
+                                            isCollapsed
+                                                ? 'h-8 w-8 mx-auto justify-center'
+                                                : 'gap-2.5 px-2 h-8'
+                                        )}
+                                        title={isCollapsed ? item.label : undefined}
+                                    >
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        {!isCollapsed && (
+                                            <span className="flex-1 text-left">{item.label}</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
                         {!isCollapsed && groups.length > 0 && (
                             <div className="px-2 pb-2">
                                 {groups.map((group) => (
