@@ -5,9 +5,11 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useChatPreferences } from '@/hooks/useChatPreferences';
 import { useAttachments } from '@/hooks/useAttachments';
-import { AttachmentChip } from './AttachmentChip';
+import { AttachmentPreview } from './AttachmentPreview';
+import { ImageLightbox } from './ImageLightbox';
+import { DragDropOverlay } from './DragDropOverlay';
 import { IMAGE_ACCEPT, DOCUMENT_ACCEPT } from '@/utils/attachments';
-import { Square, Loader2 } from 'lucide-react';
+import { Square, Loader2, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/types/attachments';
@@ -63,6 +65,11 @@ export function ChatInput({
     const [value, setValue] = React.useState("");
     const [selectedTool, setSelectedTool] = React.useState<string | null>(null);
     const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [previewSrc, setPreviewSrc] = React.useState<{ src: string; alt: string } | null>(null);
+    const dragCounterRef = React.useRef(0);
+
+    const hasImageAttachment = attachments.some((a) => a.kind === 'image');
 
     React.useEffect(() => {
         if (pendingMessage) {
@@ -104,6 +111,48 @@ export function ChatInput({
         }
     };
 
+    // ── Drag-and-drop ───────────────────────────────────────────────────────
+    const handleDragEnter = (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragCounterRef.current += 1;
+        setIsDragging(true);
+    };
+    const handleDragOver = (e: React.DragEvent) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+    };
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+        if (dragCounterRef.current === 0) setIsDragging(false);
+    };
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            addFiles(e.dataTransfer.files);
+        }
+    };
+
+    // ── Paste images / files from clipboard ─────────────────────────────────
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        const files: File[] = [];
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file') {
+                const f = item.getAsFile();
+                if (f) files.push(f);
+            }
+        }
+        if (files.length > 0) {
+            e.preventDefault();
+            addFiles(files);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (preferences.submitBehavior === 'enter') {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -121,30 +170,67 @@ export function ChatInput({
     return (
         <div className="px-4 pb-4 md:pb-6 pt-2 bg-transparent">
             <div className="max-w-full md:max-w-3xl mx-auto">
-                <div className="flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-white border dark:bg-[#303030] dark:border-transparent cursor-text">
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
+                <div
+                    onDragEnter={handleDragEnter}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className="relative flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-white border dark:bg-[#303030] dark:border-transparent cursor-text"
+                >
+                    <DragDropOverlay visible={isDragging} />
+
+                    <input
+                        type="file"
+                        ref={fileInputRef}
                         onChange={(e) => {
                             if (e.target.files) addFiles(e.target.files);
                             e.target.value = "";
-                        }} 
-                        className="hidden" 
-                        accept={`${IMAGE_ACCEPT},${DOCUMENT_ACCEPT}`} 
+                        }}
+                        className="hidden"
+                        accept={`${IMAGE_ACCEPT},${DOCUMENT_ACCEPT}`}
                         multiple
                     />
-                    
-                    {/* Attachments UI */}
-                    {attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 px-3 pt-3 pb-1">
-                            {attachments.map((a) => (
-                                <AttachmentChip key={a.id} attachment={a} onRemove={removeAttachment} />
-                            ))}
+
+                    {/* Attachments preview rail */}
+                    {(attachments.length > 0 || isProcessing) && (
+                        <div className="flex flex-col gap-2 px-2 pt-2.5 pb-1">
+                            <div className="custom-scrollbar flex flex-nowrap gap-2 overflow-x-auto pb-1">
+                                {attachments.map((a) => (
+                                    <AttachmentPreview
+                                        key={a.id}
+                                        attachment={a}
+                                        onRemove={removeAttachment}
+                                        onPreview={
+                                            a.kind === 'image' && (a.base64 || a.thumbnail)
+                                                ? () => setPreviewSrc({ src: a.base64 || a.thumbnail!, alt: a.name })
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                                {isProcessing && (
+                                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/40">
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {hasImageAttachment && (
+                                <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+                                    <Eye className="h-3 w-3" />
+                                    <span>
+                                        Vision enabled — the model will read{' '}
+                                        {attachments.filter((a) => a.kind === 'image').length === 1 ? 'this image' : 'these images'}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {processingError && (
-                        <p className="text-[11px] text-red-400 px-4 pt-2">{processingError}</p>
+                        <div className="flex items-start gap-1.5 px-3 pt-2 text-[11px] text-destructive">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                            <p>{processingError}</p>
+                        </div>
                     )}
                     
                     <textarea 
@@ -153,7 +239,8 @@ export function ChatInput({
                         value={value} 
                         onChange={handleInputChange} 
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask anything..." 
+                        onPaste={handlePaste}
+                        placeholder="Ask anything, drop a file, or paste an image..." 
                         disabled={isLoading || disabled}
                         className="custom-scrollbar w-full resize-none border-0 bg-transparent p-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-300 focus:ring-0 focus-visible:outline-none min-h-12" 
                     />
@@ -265,6 +352,12 @@ export function ChatInput({
                     SouvikAI can make mistakes. Consider checking important information.
                 </p>
             </div>
+
+            <ImageLightbox
+                src={previewSrc?.src ?? null}
+                alt={previewSrc?.alt}
+                onClose={() => setPreviewSrc(null)}
+            />
         </div>
     );
 }

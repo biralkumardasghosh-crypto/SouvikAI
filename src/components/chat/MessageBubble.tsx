@@ -10,6 +10,7 @@ import remarkGfm from 'remark-gfm';
 import { useState } from 'react';
 import { MessageActions } from './MessageActions';
 import { ThinkingTimeline } from './ThinkingTimeline';
+import { MessageAttachments } from './MessageAttachments';
 // Prism renderer — smaller bundle than highlight.js, better language auto-detection
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -230,20 +231,27 @@ export function MessageBubble({ message, isLoading, onRegenerate }: MessageBubbl
     // USER MESSAGE — right-aligned bubble, more compact
     // ─────────────────────────────────────────────────────────────────────────
     if (isUser) {
+        const hasAttachments = !!message.attachments && message.attachments.length > 0;
+        const hasText = message.content.trim().length > 0;
         return (
-            <div className="group flex flex-col items-end gap-1 px-2 md:px-4 py-1 animate-fade-in mx-1 md:mx-2">
-                <div
-                    className={cn(
-                        'max-w-[88%] md:max-w-[75%] rounded-2xl rounded-tr-md px-4 py-2.5',
-                        'bg-secondary text-secondary-foreground border border-border/40 shadow-sm',
-                        'whitespace-pre-wrap break-words',
-                        preferences.textSize === 'small' ? 'text-[13px]' :
-                            preferences.textSize === 'large' ? 'text-[17px]' : 'text-[15px]',
-                        'leading-6',
-                    )}
-                >
-                    {message.content}
-                </div>
+            <div className="group flex flex-col items-end gap-1.5 px-2 md:px-4 py-1 animate-fade-in mx-1 md:mx-2">
+                {hasAttachments && (
+                    <MessageAttachments attachments={message.attachments!} />
+                )}
+                {hasText && (
+                    <div
+                        className={cn(
+                            'max-w-[88%] md:max-w-[75%] rounded-2xl rounded-tr-md px-4 py-2.5',
+                            'bg-secondary text-secondary-foreground border border-border/40 shadow-sm',
+                            'whitespace-pre-wrap break-words',
+                            preferences.textSize === 'small' ? 'text-[13px]' :
+                                preferences.textSize === 'large' ? 'text-[17px]' : 'text-[15px]',
+                            'leading-6',
+                        )}
+                    >
+                        {message.content}
+                    </div>
+                )}
                 {timestampLabel && (
                     <span className="text-[10px] text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none mr-2">
                         {timestampLabel}
