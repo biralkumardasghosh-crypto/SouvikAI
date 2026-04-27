@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, MessageSquare, Clock, X } from 'lucide-react';
+import { Search, MessageSquare, X } from 'lucide-react';
 import { ChatSession } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/utils/date-helpers';
@@ -83,49 +83,47 @@ export function SearchModal({ open, onClose, sessions, onSelectSession }: Search
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-50 bg-black/60 animate-fadeIn"
+                className="fixed inset-0 z-50 bg-black/60"
                 onClick={onClose}
             />
 
             {/* Modal */}
-            <div className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full max-w-[440px] px-4 animate-slideDown">
-                <div className="bg-[#2a2a2a] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+            <div className="fixed top-[18%] left-1/2 -translate-x-1/2 z-50 w-full max-w-[380px] px-4">
+                <div className="bg-[#2a2a2a] rounded-xl border border-white/10 shadow-2xl overflow-hidden">
                     {/* Search input row */}
-                    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/8">
-                        <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex items-center gap-2 px-3 h-9 border-b border-white/[0.08]">
+                        <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <input
                             ref={inputRef}
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder="Search your chats…"
-                            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
+                            className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground outline-none"
                         />
                         {query && (
                             <button
                                 onClick={() => setQuery('')}
                                 className="text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Clear search"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5" />
                             </button>
                         )}
-                        <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground bg-white/5 border border-white/10 font-mono">
-                            Esc
-                        </kbd>
                     </div>
 
                     {/* Results */}
-                    <div ref={listRef} className="max-h-[360px] overflow-y-auto py-2">
+                    <div ref={listRef} className="max-h-[280px] overflow-y-auto py-1">
                         {filtered.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
-                                <MessageSquare className="h-8 w-8 opacity-30" />
-                                <p className="text-xs">No chats found for &quot;{query}&quot;</p>
+                            <div className="flex flex-col items-center justify-center py-6 gap-1.5 text-muted-foreground">
+                                <MessageSquare className="h-5 w-5 opacity-30" />
+                                <p className="text-[11px]">No chats found</p>
                             </div>
                         ) : (
                             <>
                                 {!query && (
-                                    <div className="px-4 py-1.5 text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
-                                        Recent chats
+                                    <div className="px-3 pt-1.5 pb-1 text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
+                                        Recent
                                     </div>
                                 )}
                                 {filtered.map((session, i) => (
@@ -135,24 +133,21 @@ export function SearchModal({ open, onClose, sessions, onSelectSession }: Search
                                         onClick={() => handleSelect(session.id)}
                                         onMouseEnter={() => setActiveIndex(i)}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
+                                            'w-full flex items-center gap-2 px-3 h-8 text-left transition-colors',
                                             i === activeIndex
-                                                ? 'bg-white/8 text-foreground'
+                                                ? 'bg-white/[0.08] text-foreground'
                                                 : 'text-muted-foreground hover:text-foreground'
                                         )}
                                     >
-                                        <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs truncate font-medium">
-                                                {query
-                                                    ? highlightMatch(session.title, query)
-                                                    : session.title}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50 shrink-0">
-                                            <Clock className="h-3 w-3" />
+                                        <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+                                        <p className="flex-1 min-w-0 text-[12.5px] truncate">
+                                            {query
+                                                ? highlightMatch(session.title, query)
+                                                : session.title}
+                                        </p>
+                                        <span className="text-[10px] text-muted-foreground/50 shrink-0">
                                             {formatRelativeTime(session.updatedAt)}
-                                        </div>
+                                        </span>
                                     </button>
                                 ))}
                             </>
@@ -160,10 +155,10 @@ export function SearchModal({ open, onClose, sessions, onSelectSession }: Search
                     </div>
 
                     {/* Footer hint */}
-                    <div className="px-4 py-2.5 border-t border-white/8 flex items-center gap-4 text-[10px] text-muted-foreground/50">
+                    <div className="px-3 h-7 border-t border-white/[0.08] flex items-center gap-3 text-[10px] text-muted-foreground/50">
                         <span className="flex items-center gap-1">
                             <kbd className="font-mono bg-white/5 border border-white/10 rounded px-1">↑↓</kbd>
-                            navigate
+                            nav
                         </span>
                         <span className="flex items-center gap-1">
                             <kbd className="font-mono bg-white/5 border border-white/10 rounded px-1">↵</kbd>
@@ -174,7 +169,7 @@ export function SearchModal({ open, onClose, sessions, onSelectSession }: Search
                             close
                         </span>
                         <span className="ml-auto">
-                            {filtered.length} {filtered.length === 1 ? 'chat' : 'chats'}
+                            {filtered.length}
                         </span>
                     </div>
                 </div>
