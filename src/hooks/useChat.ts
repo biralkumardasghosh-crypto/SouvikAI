@@ -364,13 +364,14 @@ export function useChat() {
                                         ),
                                     }));
 
-                                    // 5. Kick off a second request to the model with the search results
-                                    await runCompletion(undefined, data.results || [], query);
+                                    // 5. Kick off a second request to the model with the search results.
+                                    //    Return its final content so the outer caller (and the DB save)
+                                    //    use the real answer, not the raw "<search>…</search>" placeholder.
+                                    return await runCompletion(undefined, data.results || [], query);
                                 } catch (e) {
                                     console.error('[Chat] Search failed, falling back:', e);
-                                    await runCompletion(undefined, [], query);
+                                    return await runCompletion(undefined, [], query);
                                 }
-                                return assistantContent; // Exit the stream reader
                             }
                             // Still streaming the <search> tag, don't show it to the user yet
                             continue;
