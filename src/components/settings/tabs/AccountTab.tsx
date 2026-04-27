@@ -86,47 +86,47 @@ export function AccountTab() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-5 pb-3">
             {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-sm rounded-xl">
+                <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 text-[12px] rounded-md">
                     {error}
                 </div>
             )}
 
             {/* Profile Section */}
-            <div className="space-y-4">
-                <h3 className="text-lg font-medium">Profile</h3>
-                <div className="space-y-4 max-w-sm">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Email</label>
-                        <Input value={user.email} disabled className="bg-white/5" />
-                        <p className="text-xs text-muted-foreground">Your email address cannot be changed.</p>
+            <div className="space-y-2.5">
+                <h3 className="text-[13px] font-semibold text-foreground">Profile</h3>
+                <div className="space-y-2.5 max-w-sm">
+                    <div className="space-y-1">
+                        <label className="text-[12px] font-medium text-foreground">Email</label>
+                        <Input value={user.email} disabled className="bg-white/5 h-8 text-[12px]" />
+                        <p className="text-[10.5px] text-muted-foreground">Your email address cannot be changed.</p>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Display Name</label>
+                    <div className="space-y-1">
+                        <label className="text-[12px] font-medium text-foreground">Display Name</label>
                         <Input
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. John Doe"
-                            className="bg-transparent"
+                            className="bg-transparent h-8 text-[12px]"
                         />
                     </div>
                 </div>
                 <Button
                     onClick={handleSaveName}
                     disabled={isSavingName || !name.trim()}
-                    className="mt-4 gap-2"
+                    className="mt-2 h-7 px-3 text-[11px] gap-1.5"
                 >
-                    {isSavingName && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {nameSaved ? <><CheckCircle2 className="h-4 w-4" /> Saved</> : 'Save Display Name'}
+                    {isSavingName && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {nameSaved ? <><CheckCircle2 className="h-3 w-3" /> Saved</> : 'Save Display Name'}
                 </Button>
             </div>
 
             {/* Security Section */}
-            <div className="pt-6 border-t border-border space-y-4">
-                <h3 className="text-lg font-medium text-red-500">Security</h3>
-                <div className="space-y-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
+            <div className="pt-4 border-t border-border space-y-2.5">
+                <h3 className="text-[13px] font-semibold text-red-500">Security</h3>
+                <div className="max-w-sm text-[11.5px] text-muted-foreground leading-snug">
                     <p>To change your password, we need to verify your identity. Click the button below and we will send a secure password reset link to <strong className="text-foreground">{user.email}</strong> via Twilio.</p>
                 </div>
 
@@ -134,10 +134,10 @@ export function AccountTab() {
                     variant="destructive"
                     onClick={handleSendPasswordReset}
                     disabled={isSendingReset || resetSent}
-                    className="mt-4 gap-2"
+                    className="mt-2 h-7 px-3 text-[11px] gap-1.5"
                 >
-                    {isSendingReset && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {resetSent ? <><CheckCircle2 className="h-4 w-4" /> Reset Email Dispatched</> : 'Request Password Reset'}
+                    {isSendingReset && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {resetSent ? <><CheckCircle2 className="h-3 w-3" /> Reset Email Dispatched</> : 'Request Password Reset'}
                 </Button>
             </div>
         </div>

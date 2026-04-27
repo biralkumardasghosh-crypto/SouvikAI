@@ -65,21 +65,21 @@ export function SettingsModal({ open, onOpenChange, onOpenArchivedChat, initialT
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             {/* [&>button]:hidden prevents the default Radix close button from rendering and overlapping our UI */}
-            <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden h-[85vh] max-h-[750px] flex flex-col md:flex-row gap-0 bg-background border border-border [&>button]:hidden rounded-2xl shadow-xl">
+            <DialogContent className="max-w-[760px] w-[94vw] p-0 overflow-hidden h-[78vh] max-h-[620px] flex flex-col md:flex-row gap-0 bg-background border border-border [&>button]:hidden rounded-xl shadow-xl">
                 <DialogTitle className="sr-only">Settings</DialogTitle>
 
                 {/* Sidebar */}
-                <div className="w-full md:w-[260px] flex flex-col flex-shrink-0 pt-0 relative bg-background/50">
-                    <div className="h-16 flex items-center px-4 md:px-6 z-10">
+                <div className="w-full md:w-[200px] flex flex-col flex-shrink-0 pt-0 relative bg-background/50 md:border-r md:border-border/40">
+                    <div className="h-11 flex items-center px-3 md:px-4 z-10">
                         <button
                             onClick={() => onOpenChange(false)}
                             className="text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1"
                         >
-                            <X className="h-5 w-5 md:h-6 md:w-6" strokeWidth={1.5} />
+                            <X className="h-4 w-4" strokeWidth={1.5} />
                         </button>
                     </div>
 
-                    <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-y-auto px-4 md:px-3 pb-4 md:pb-0 hide-scrollbar">
+                    <nav className="flex md:flex-col gap-0.5 overflow-x-auto md:overflow-y-auto px-2 md:px-2 pb-2 md:pb-0 hide-scrollbar">
                         {tabs.map((tab) => {
                             const isActive = activeTab === tab.id;
                             const isArchived = tab.id === 'archived';
@@ -88,14 +88,14 @@ export function SettingsModal({ open, onOpenChange, onOpenArchivedChat, initialT
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={cn(
-                                        'flex-shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors text-left',
+                                        'flex-shrink-0 md:w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-colors text-left',
                                         isActive
                                             ? 'bg-muted text-foreground font-medium'
                                             : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-                                        isArchived && !isActive && 'mt-1 border-t border-border/30 pt-3'
+                                        isArchived && !isActive && 'mt-0.5 border-t border-border/30 pt-2'
                                     )}
                                 >
-                                    <tab.icon className="h-[15px] w-[15px] shrink-0" strokeWidth={isActive ? 2 : 1.5} />
+                                    <tab.icon className="h-[13px] w-[13px] shrink-0" strokeWidth={isActive ? 2 : 1.5} />
                                     {tab.name}
                                 </button>
                             );
@@ -104,9 +104,9 @@ export function SettingsModal({ open, onOpenChange, onOpenArchivedChat, initialT
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto bg-background px-6 py-4 md:px-10 md:py-8">
-                    <div className="max-w-2xl mx-auto h-full space-y-6">
-                        <h1 className="text-xl md:text-[22px] font-medium text-foreground pb-4 border-b border-border/60">
+                <div className="flex-1 overflow-y-auto bg-background px-4 py-3 md:px-7 md:py-5">
+                    <div className="max-w-2xl mx-auto h-full space-y-4">
+                        <h1 className="text-[15px] md:text-base font-medium text-foreground pb-2.5 border-b border-border/60">
                             {activeTabName}
                         </h1>
 

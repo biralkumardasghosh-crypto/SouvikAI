@@ -70,11 +70,11 @@ interface SettingRowProps {
  */
 function SettingRow({ label, description, control }: SettingRowProps) {
     return (
-        <div className="flex items-center justify-between gap-6 px-4 py-3.5 min-h-[56px]">
+        <div className="flex items-center justify-between gap-4 px-3 py-2 min-h-[40px]">
             <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-normal text-foreground leading-none">{label}</p>
+                <p className="text-[13px] font-normal text-foreground leading-none">{label}</p>
                 {description && (
-                    <p className="text-[12px] text-muted-foreground mt-1.5 leading-relaxed max-w-sm">
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-snug max-w-sm">
                         {description}
                     </p>
                 )}
@@ -105,7 +105,7 @@ function Toggle({
             disabled={disabled}
             onClick={() => onChange(!checked)}
             className={cn(
-                'relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer rounded-full border-2 border-transparent',
+                'relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full border-2 border-transparent',
                 'transition-colors duration-200 ease-in-out',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                 checked ? 'bg-white' : 'bg-white/20',
@@ -114,9 +114,9 @@ function Toggle({
         >
             <span
                 className={cn(
-                    'pointer-events-none block h-[18px] w-[18px] rounded-full shadow-sm',
+                    'pointer-events-none block h-[14px] w-[14px] rounded-full shadow-sm',
                     'transform transition-transform duration-200 ease-in-out',
-                    checked ? 'translate-x-[18px] bg-black' : 'translate-x-0 bg-white/70',
+                    checked ? 'translate-x-[14px] bg-black' : 'translate-x-0 bg-white/70',
                 )}
             />
         </button>
@@ -128,7 +128,7 @@ function SettingsSelect({
     value,
     onValueChange,
     options,
-    width = 'w-[160px]',
+    width = 'w-[140px]',
 }: {
     value: string;
     onValueChange: (v: string) => void;
@@ -140,7 +140,7 @@ function SettingsSelect({
             <SelectTrigger
                 className={cn(
                     width,
-                    'h-8 text-[13px] bg-transparent border-border/50 text-foreground',
+                    'h-7 text-[12px] bg-transparent border-border/50 text-foreground px-2.5',
                     'hover:bg-white/5 focus:ring-0 focus:ring-offset-0',
                 )}
             >
@@ -148,7 +148,7 @@ function SettingsSelect({
             </SelectTrigger>
             <SelectContent className="bg-[#2a2a2a] border-border/50">
                 {options.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-[13px]">
+                    <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
                         {opt.label}
                     </SelectItem>
                 ))}
@@ -171,13 +171,13 @@ function AccentColorSelect({
         <Select value={value} onValueChange={onValueChange}>
             <SelectTrigger
                 className={cn(
-                    'w-[160px] h-8 text-[13px] bg-transparent border-border/50 text-foreground',
+                    'w-[140px] h-7 text-[12px] bg-transparent border-border/50 text-foreground px-2.5',
                     'hover:bg-white/5 focus:ring-0 focus:ring-offset-0',
                 )}
             >
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5">
                     <span
-                        className="h-3 w-3 rounded-full shrink-0"
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: current.hex }}
                     />
                     <SelectValue />
@@ -185,10 +185,10 @@ function AccentColorSelect({
             </SelectTrigger>
             <SelectContent className="bg-[#2a2a2a] border-border/50">
                 {ACCENT_COLORS.map((c) => (
-                    <SelectItem key={c.id} value={c.id} className="text-[13px]">
-                        <span className="flex items-center gap-2">
+                    <SelectItem key={c.id} value={c.id} className="text-[12px]">
+                        <span className="flex items-center gap-1.5">
                             <span
-                                className="h-3 w-3 rounded-full shrink-0"
+                                className="h-2.5 w-2.5 rounded-full shrink-0"
                                 style={{ backgroundColor: c.hex }}
                             />
                             {c.label}
@@ -203,7 +203,7 @@ function AccentColorSelect({
 /** A visual card container that groups related settings rows. */
 function SettingsCard({ children }: { children: React.ReactNode }) {
     return (
-        <div className="rounded-xl border border-border/40 bg-muted/10 overflow-hidden divide-y divide-border/30">
+        <div className="rounded-lg border border-border/40 bg-muted/10 overflow-hidden divide-y divide-border/30">
             {children}
         </div>
     );
@@ -212,7 +212,7 @@ function SettingsCard({ children }: { children: React.ReactNode }) {
 /** Section label above a card — matches reference screenshot's section titles. */
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-0.5 pt-6 pb-2 first:pt-0">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-0.5 pt-4 pb-1.5 first:pt-0">
             {children}
         </p>
     );
@@ -272,7 +272,7 @@ export function GeneralTab({ onNavigateToArchived }: GeneralTabProps = {}) {
     }
 
     return (
-        <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-4">
+        <div className="space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-3">
 
             {/* ── Display ─────────────────────────────────────────────────── */}
             <SectionLabel>Display</SectionLabel>
@@ -337,7 +337,7 @@ export function GeneralTab({ onNavigateToArchived }: GeneralTabProps = {}) {
                             value={preferences.language}
                             onValueChange={(v) => updatePreference('language', v)}
                             options={LANGUAGES}
-                            width="w-[180px]"
+                            width="w-[160px]"
                         />
                     }
                 />
@@ -374,9 +374,9 @@ export function GeneralTab({ onNavigateToArchived }: GeneralTabProps = {}) {
                     }
                 />
                 {!preferences.showMessageActions && (
-                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.02]">
-                        <RefreshCw className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                        <p className="text-[11.5px] text-muted-foreground/50">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.02]">
+                        <RefreshCw className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                        <p className="text-[10.5px] text-muted-foreground/50">
                             Regenerate is unavailable while the action bar is hidden.
                         </p>
                     </div>
@@ -398,9 +398,9 @@ export function GeneralTab({ onNavigateToArchived }: GeneralTabProps = {}) {
                     }
                 />
                 {!preferences.showPromptSuggestions && (
-                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.02]">
-                        <Sparkles className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                        <p className="text-[11.5px] text-muted-foreground/50">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.02]">
+                        <Sparkles className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                        <p className="text-[10.5px] text-muted-foreground/50">
                             The input box will still appear — only the suggestion cards are hidden.
                         </p>
                     </div>
@@ -417,11 +417,11 @@ export function GeneralTab({ onNavigateToArchived }: GeneralTabProps = {}) {
                         <button
                             type="button"
                             onClick={onNavigateToArchived}
-                            className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors group"
+                            className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors group"
                         >
-                            <Archive className="h-4 w-4 shrink-0" />
+                            <Archive className="h-3.5 w-3.5 shrink-0" />
                             <span>View</span>
-                            <ChevronRight className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                            <ChevronRight className="h-3 w-3 opacity-50 group-hover:opacity-100 transition-opacity" />
                         </button>
                     }
                 />

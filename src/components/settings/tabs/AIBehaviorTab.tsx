@@ -40,25 +40,25 @@ function InlineSelect<T extends string>({
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] font-normal transition-colors',
+                    'flex items-center gap-1 px-2 py-0.5 rounded-md text-[12px] font-normal transition-colors',
                     isNonDefault
                         ? 'bg-white/10 text-foreground hover:bg-white/15'
                         : 'text-foreground hover:bg-white/5',
                 )}
             >
                 <span>{label}</span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
 
             {open && (
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] bg-[#2a2a2a] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1">
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[110px] bg-[#2a2a2a] border border-white/10 rounded-md shadow-xl overflow-hidden py-1">
                     {options.map(opt => (
                         <button
                             key={opt.value}
                             type="button"
                             onClick={() => { onValueChange(opt.value); setOpen(false); }}
                             className={cn(
-                                'w-full text-left px-3 py-2 text-[13px] transition-colors',
+                                'w-full text-left px-2.5 py-1.5 text-[12px] transition-colors',
                                 opt.value === value
                                     ? 'text-foreground bg-white/10'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-white/5',
@@ -101,8 +101,8 @@ function Row({
     className?: string;
 }) {
     return (
-        <div className={cn('flex items-center justify-between py-3', className)}>
-            <span className="text-[14px] text-foreground">{label}</span>
+        <div className={cn('flex items-center justify-between py-2', className)}>
+            <span className="text-[13px] text-foreground">{label}</span>
             {control}
         </div>
     );
@@ -151,14 +151,14 @@ export function PersonalizationTab() {
     };
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 pb-4">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 pb-3">
 
             {/* Base style and tone */}
-            <div className="pb-3 border-b border-border/30">
-                <div className="flex items-start justify-between gap-4 py-1">
+            <div className="pb-2 border-b border-border/30">
+                <div className="flex items-start justify-between gap-3 py-0.5">
                     <div className="min-w-0">
-                        <p className="text-[14px] text-foreground">Base style and tone</p>
-                        <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
+                        <p className="text-[13px] text-foreground">Base style and tone</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
                             Set the style and tone of how the AI responds to you. This doesn&apos;t impact the AI&apos;s capabilities.
                         </p>
                     </div>
@@ -173,9 +173,9 @@ export function PersonalizationTab() {
             </div>
 
             {/* Characteristics */}
-            <div className="pt-4 pb-1">
-                <p className="text-[14px] font-semibold text-foreground">Characteristics</p>
-                <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
+            <div className="pt-3 pb-0.5">
+                <p className="text-[13px] font-semibold text-foreground">Characteristics</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
                     Choose additional customizations on top of your base style and tone.
                 </p>
             </div>
@@ -224,27 +224,27 @@ export function PersonalizationTab() {
             </div>
 
             {/* Custom instructions */}
-            <div className="pt-5 border-t border-border/30 mt-1 space-y-3">
-                <p className="text-[14px] text-foreground">Custom instructions</p>
+            <div className="pt-3 border-t border-border/30 mt-1 space-y-2">
+                <p className="text-[13px] text-foreground">Custom instructions</p>
                 <Textarea
                     value={localPrompt}
                     onChange={(e) => setLocalPrompt(e.target.value)}
                     placeholder="e.g. I'm a senior TypeScript engineer. Keep responses concise and production-ready."
-                    className="min-h-[120px] bg-transparent border-border/40 hover:border-border/70 focus:border-primary text-[13px] resize-y p-3 rounded-lg"
+                    className="min-h-[88px] bg-transparent border-border/40 hover:border-border/70 focus:border-primary text-[12px] resize-y p-2.5 rounded-md"
                 />
                 <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-muted-foreground/60">
+                    <p className="text-[10px] text-muted-foreground/60">
                         {localPrompt.length} / 2,000
                     </p>
                     <Button
                         onClick={handleSave}
                         disabled={isSaving || localPrompt === preferences.systemPrompt || localPrompt.length > 2000}
-                        className="h-8 px-4 text-[12px] rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-all flex items-center gap-2"
+                        className="h-7 px-3 text-[11px] rounded-md bg-primary hover:bg-primary/90 text-primary-foreground transition-all flex items-center gap-1.5"
                     >
                         {isSaving ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                            <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
                         ) : saved ? (
-                            <><Check className="h-3.5 w-3.5" /> Saved</>
+                            <><Check className="h-3 w-3" /> Saved</>
                         ) : 'Save'}
                     </Button>
                 </div>
