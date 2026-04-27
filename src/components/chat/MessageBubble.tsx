@@ -1,10 +1,9 @@
 'use client';
 
-import { Avatar, AvatarFallback } from '@/components/ui';
 import { useChatPreferences } from '@/hooks/useChatPreferences';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
-import { Sparkles, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useState } from 'react';
@@ -265,25 +264,13 @@ export function MessageBubble({ message, isLoading, onRegenerate }: MessageBubbl
     // ASSISTANT MESSAGE — full width, structured canvas
     // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="group flex gap-3 md:gap-4 px-2 md:px-4 py-3 animate-fade-in mx-1 md:mx-2 rounded-xl">
-            <Avatar className="h-8 w-8 shrink-0 shadow-sm border border-border/50 bg-gradient-to-br from-primary/15 to-primary/5">
-                <AvatarFallback className="bg-transparent text-primary">
-                    <Sparkles className="h-4 w-4" strokeWidth={2.25} />
-                </AvatarFallback>
-            </Avatar>
-
+        <div className="group flex px-2 md:px-4 py-3 animate-fade-in mx-1 md:mx-2 rounded-xl">
             <div className="flex-1 min-w-0 space-y-1.5">
-                {/* Header row: name + timestamp */}
-                <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground tracking-tight">
-                        Souvik&apos;s AI
-                    </p>
-                    {timestampLabel && (
-                        <span className="text-[11px] text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none">
-                            {timestampLabel}
-                        </span>
-                    )}
-                </div>
+                {timestampLabel && (
+                    <span className="block text-[11px] text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none">
+                        {timestampLabel}
+                    </span>
+                )}
 
                 {/* Reasoning timeline (think blocks + web search) */}
                 {showTimeline && (
