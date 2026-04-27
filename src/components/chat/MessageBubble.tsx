@@ -297,7 +297,7 @@ export function MessageBubble({ message, isLoading, onRegenerate }: MessageBubbl
 
                 {/* Markdown body */}
                 {displayContent && (
-                    <div className={proseClasses}>
+                    <div className={cn(proseClasses, isLoading && 'streaming-caret')}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {displayContent}
                         </ReactMarkdown>

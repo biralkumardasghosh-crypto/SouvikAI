@@ -49,3 +49,5 @@ export {
     DropdownMenuRadioGroup,
 } from './dropdown-menu';
 export { default as ShinyText } from './ShinyText';
+export { ToastProvider, useToast } from './toast';
+export type { ToastOptions, ToastVariant } from './toast';
