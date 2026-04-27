@@ -3,9 +3,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft,
-    Search,
     Plus,
+    Search,
     Pin,
     Archive,
     Trash2,
@@ -13,18 +12,24 @@ import {
     MoreHorizontal,
     Check,
     X,
-    Inbox,
     ArchiveRestore,
-    MessageSquare,
-    SlidersHorizontal,
+    ListFilter,
+    ChevronDown,
+    Inbox,
+    Star,
+    Triangle,
+    CircleDashed,
+    Loader2,
+    Menu,
+    PanelLeftClose,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatSession } from '@/types/chat';
-import { ConfirmModal } from '@/components/chat';
+import { ConfirmModal, Sidebar, SearchModal } from '@/components/chat';
+import { ChatAccentProvider } from '@/components/chat/ChatAccentProvider';
 import { cn } from '@/lib/utils';
-import { formatRelativeTime, formatChatDate } from '@/utils/date-helpers';
-import { Loader2 } from 'lucide-react';
+import { formatRelativeTime } from '@/utils/date-helpers';
 
 const supabase = createClient();
 
@@ -35,6 +40,18 @@ interface PendingDelete {
     sessionId: string;
     title: string;
 }
+
+const FILTER_LABEL: Record<FilterId, string> = {
+    all: 'All chats',
+    pinned: 'Pinned',
+    archived: 'Archived',
+};
+
+const SORT_LABEL: Record<SortId, string> = {
+    recent: 'Updated',
+    oldest: 'Oldest',
+    az: 'Title (A-Z)',
+};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Page component
@@ -51,6 +68,8 @@ export default function AllChatsPage() {
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
     // ── Auth gate ──
     useEffect(() => {
@@ -120,29 +139,50 @@ export default function AllChatsPage() {
         setRenameValue('');
     }, []);
 
-    const handleTogglePin = useCallback(async (session: ChatSession) => {
-        const newPinned = !session.isPinned;
+    const handleTogglePin = useCallback(async (sessionId: string) => {
+        let newPinned = false;
         setSessions((prev) =>
-            prev.map((s) => (s.id === session.id ? { ...s, isPinned: newPinned } : s))
+            prev.map((s) => {
+                if (s.id === sessionId) {
+                    newPinned = !s.isPinned;
+                    return { ...s, isPinned: newPinned };
+                }
+                return s;
+            })
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
             .from('chat_sessions')
             .update({ is_pinned: newPinned })
-            .eq('id', session.id);
+            .eq('id', sessionId);
     }, []);
 
-    const handleToggleArchive = useCallback(async (session: ChatSession) => {
-        const newArchived = !session.isArchived;
+    const handleToggleArchive = useCallback(async (sessionId: string) => {
+        let newArchived = false;
         setSessions((prev) =>
-            prev.map((s) => (s.id === session.id ? { ...s, isArchived: newArchived } : s))
+            prev.map((s) => {
+                if (s.id === sessionId) {
+                    newArchived = !s.isArchived;
+                    return { ...s, isArchived: newArchived };
+                }
+                return s;
+            })
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
             .from('chat_sessions')
             .update({ is_archived: newArchived })
-            .eq('id', session.id);
+            .eq('id', sessionId);
     }, []);
+
+    const handleDeleteRequest = useCallback(
+        (sessionId: string) => {
+            const target = sessions.find((s) => s.id === sessionId);
+            if (!target) return;
+            setPendingDelete({ sessionId, title: target.title });
+        },
+        [sessions]
+    );
 
     const handleDeleteConfirm = useCallback(async () => {
         if (!pendingDelete) return;
@@ -159,26 +199,46 @@ export default function AllChatsPage() {
         [router]
     );
 
+    const handleNewChat = useCallback(() => {
+        router.push('/');
+    }, [router]);
+
+    const handleRenameFromSidebar = useCallback(
+        async (sessionId: string, title: string) => {
+            const trimmed = title.trim();
+            if (!trimmed) return;
+            setSessions((prev) =>
+                prev.map((s) => (s.id === sessionId ? { ...s, title: trimmed } : s))
+            );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
+                .from('chat_sessions')
+                .update({ title: trimmed })
+                .eq('id', sessionId);
+        },
+        []
+    );
+
     // ── Filtering & sorting ──
-    const counts = useMemo(() => ({
-        all: sessions.filter((s) => !s.isArchived).length,
-        pinned: sessions.filter((s) => s.isPinned && !s.isArchived).length,
-        archived: sessions.filter((s) => s.isArchived).length,
-    }), [sessions]);
+    const counts = useMemo(
+        () => ({
+            all: sessions.filter((s) => !s.isArchived).length,
+            pinned: sessions.filter((s) => s.isPinned && !s.isArchived).length,
+            archived: sessions.filter((s) => s.isArchived).length,
+        }),
+        [sessions]
+    );
 
     const filtered = useMemo(() => {
         let list = sessions;
 
-        // Filter
         if (filter === 'all') list = list.filter((s) => !s.isArchived);
         else if (filter === 'pinned') list = list.filter((s) => s.isPinned && !s.isArchived);
         else if (filter === 'archived') list = list.filter((s) => s.isArchived);
 
-        // Search
         const q = query.trim().toLowerCase();
         if (q) list = list.filter((s) => s.title.toLowerCase().includes(q));
 
-        // Sort
         const sorted = [...list];
         if (sort === 'recent') {
             sorted.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
@@ -188,7 +248,7 @@ export default function AllChatsPage() {
             sorted.sort((a, b) => a.title.localeCompare(b.title));
         }
 
-        // Pinned always on top within "all" view (regardless of sort)
+        // Pinned always on top within "all" view
         if (filter === 'all') {
             sorted.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
@@ -200,6 +260,12 @@ export default function AllChatsPage() {
         return sorted;
     }, [sessions, filter, query, sort]);
 
+    // Sessions to feed to the Sidebar (sidebar shows non-archived only).
+    const sidebarSessions = useMemo(
+        () => sessions.filter((s) => !s.isArchived),
+        [sessions]
+    );
+
     // ── Render ──
     if (authLoading || !isAuthenticated) {
         return (
@@ -210,126 +276,152 @@ export default function AllChatsPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-[#212121] text-foreground">
-            {/* ── Header ── */}
-            <header className="sticky top-0 z-20 bg-[#212121]/80 backdrop-blur border-b border-white/[0.06]">
-                <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center gap-2">
+        <ChatAccentProvider>
+            {/* Sidebar (kept visible on the chats page) */}
+            <Sidebar
+                sessions={sidebarSessions}
+                currentSessionId={null}
+                onNewChat={handleNewChat}
+                onSearch={() => setIsSearchModalOpen(true)}
+                onSelectSession={(sessionId) => handleOpenChat(sessionId)}
+                onDeleteSession={handleDeleteRequest}
+                onPinSession={handleTogglePin}
+                onArchiveSession={handleToggleArchive}
+                onRenameSession={handleRenameFromSidebar}
+                onOpenArchivedChat={(sessionId) => handleOpenChat(sessionId)}
+                isMobileOpen={isSidebarOpen}
+                onMobileClose={() => setIsSidebarOpen(false)}
+            />
+
+            {/* Main area */}
+            <div className="flex-1 flex flex-col min-w-0 relative z-10">
+                {/* Compact top bar (mobile sidebar trigger only) */}
+                <header className="flex items-center justify-between px-2 md:px-3 py-2 bg-[#212121] sticky top-0 z-20">
                     <button
-                        onClick={() => router.push('/')}
-                        className="h-8 w-8 -ml-1 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
-                        title="Back to chat"
-                        aria-label="Back to chat"
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                        aria-label="Open sidebar"
                     >
-                        <ArrowLeft className="h-4 w-4" />
+                        <Menu className="h-5 w-5" />
                     </button>
-                    <h1 className="text-[15px] font-semibold tracking-tight">Your chats</h1>
-                    <div className="ml-auto">
-                        <button
-                            onClick={() => router.push('/')}
-                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-white/[0.06] hover:bg-white/[0.1] text-foreground text-[13px] font-medium border border-white/10 transition-colors"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            New chat
-                        </button>
+                    <div className="hidden md:flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/50">
+                        <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
                     </div>
-                </div>
-            </header>
+                </header>
 
-            {/* ── Main ── */}
-            <main className="flex-1 w-full">
-                <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
-                    {/* Search */}
-                    <div className="relative mb-4">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search chats by title…"
-                            className="w-full h-11 pl-10 pr-10 rounded-xl bg-white/[0.04] border border-white/[0.08] focus:border-white/[0.2] focus:bg-white/[0.06] text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none transition-colors"
-                        />
-                        {query && (
-                            <button
-                                onClick={() => setQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
-                                aria-label="Clear search"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                            </button>
-                        )}
-                    </div>
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="max-w-[1100px] mx-auto px-6 md:px-10 lg:px-14 pt-4 md:pt-6 pb-16">
+                        {/* Title */}
+                        <h1 className="text-[28px] md:text-[32px] font-semibold tracking-tight text-foreground mb-5 md:mb-6">
+                            Chats
+                        </h1>
 
-                    {/* Filter chips + sort */}
-                    <div className="flex items-center gap-2 mb-5 flex-wrap">
-                        <FilterChip
-                            active={filter === 'all'}
-                            onClick={() => setFilter('all')}
-                            icon={<Inbox className="h-3.5 w-3.5" />}
-                            label="All"
-                            count={counts.all}
-                        />
-                        <FilterChip
-                            active={filter === 'pinned'}
-                            onClick={() => setFilter('pinned')}
-                            icon={<Pin className="h-3.5 w-3.5 rotate-45" />}
-                            label="Pinned"
-                            count={counts.pinned}
-                        />
-                        <FilterChip
-                            active={filter === 'archived'}
-                            onClick={() => setFilter('archived')}
-                            icon={<Archive className="h-3.5 w-3.5" />}
-                            label="Archived"
-                            count={counts.archived}
-                        />
+                        {/* Search row */}
+                        <div className="flex items-stretch gap-2 mb-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Search chats..."
+                                    className="w-full h-10 pl-10 pr-9 rounded-lg bg-white/[0.03] border border-white/[0.08] focus:border-white/[0.2] focus:bg-white/[0.05] text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none transition-colors"
+                                />
+                                {query && (
+                                    <button
+                                        onClick={() => setQuery('')}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                                        aria-label="Clear search"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
 
-                        <div className="ml-auto">
                             <SortMenu sort={sort} onChange={setSort} />
+
+                            <button
+                                onClick={handleNewChat}
+                                className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-foreground text-[13px] font-medium border border-white/[0.1] transition-colors"
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span>New chat</span>
+                            </button>
+                        </div>
+
+                        {/* Filter button */}
+                        <div className="mb-5">
+                            <FilterMenu
+                                filter={filter}
+                                counts={counts}
+                                onChange={setFilter}
+                            />
+                        </div>
+
+                        {/* Column headers */}
+                        <div className="hidden md:grid grid-cols-[minmax(0,1fr)_220px_180px] items-center gap-4 px-3 pb-2 border-b border-white/[0.05] text-[12px] font-medium text-muted-foreground/70 uppercase tracking-wide">
+                            <div>Name</div>
+                            <div>Project</div>
+                            <div className="flex items-center justify-end gap-1">
+                                <button
+                                    onClick={() =>
+                                        setSort((cur) => (cur === 'recent' ? 'oldest' : 'recent'))
+                                    }
+                                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors uppercase"
+                                >
+                                    {SORT_LABEL[sort]}
+                                    <ChevronDown className="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        <div className="mt-1">
+                            {loading ? (
+                                <div className="py-16 flex items-center justify-center">
+                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+                                </div>
+                            ) : filtered.length === 0 ? (
+                                <EmptyState filter={filter} query={query} />
+                            ) : (
+                                <ul className="flex flex-col">
+                                    {filtered.map((session) => (
+                                        <ChatRow
+                                            key={session.id}
+                                            session={session}
+                                            user={user}
+                                            isRenaming={renamingId === session.id}
+                                            renameValue={renameValue}
+                                            onRenameValueChange={setRenameValue}
+                                            onRenameStart={() => handleRenameStart(session)}
+                                            onRenameSave={handleRenameSave}
+                                            onRenameCancel={handleRenameCancel}
+                                            onOpen={() => handleOpenChat(session.id)}
+                                            onTogglePin={() => handleTogglePin(session.id)}
+                                            onToggleArchive={() => handleToggleArchive(session.id)}
+                                            onDelete={() =>
+                                                setPendingDelete({
+                                                    sessionId: session.id,
+                                                    title: session.title,
+                                                })
+                                            }
+                                        />
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
-
-                    {/* Results meta */}
-                    <div className="flex items-center justify-between mb-2 px-1">
-                        <p className="text-[12px] text-muted-foreground/70">
-                            {loading
-                                ? 'Loading…'
-                                : `${filtered.length} ${filtered.length === 1 ? 'chat' : 'chats'}${query ? ` matching "${query}"` : ''}`}
-                        </p>
-                    </div>
-
-                    {/* List */}
-                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-                        {loading ? (
-                            <div className="py-16 flex items-center justify-center">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
-                            </div>
-                        ) : filtered.length === 0 ? (
-                            <EmptyState filter={filter} query={query} />
-                        ) : (
-                            <ul className="divide-y divide-white/[0.05]">
-                                {filtered.map((session) => (
-                                    <ChatRow
-                                        key={session.id}
-                                        session={session}
-                                        isRenaming={renamingId === session.id}
-                                        renameValue={renameValue}
-                                        onRenameValueChange={setRenameValue}
-                                        onRenameStart={() => handleRenameStart(session)}
-                                        onRenameSave={handleRenameSave}
-                                        onRenameCancel={handleRenameCancel}
-                                        onOpen={() => handleOpenChat(session.id)}
-                                        onTogglePin={() => handleTogglePin(session)}
-                                        onToggleArchive={() => handleToggleArchive(session)}
-                                        onDelete={() =>
-                                            setPendingDelete({ sessionId: session.id, title: session.title })
-                                        }
-                                    />
-                                ))}
-                            </ul>
-                        )}
-                    </div>
                 </div>
-            </main>
+            </div>
+
+            {/* Search modal (triggered from sidebar) */}
+            <SearchModal
+                open={isSearchModalOpen}
+                onClose={() => setIsSearchModalOpen(false)}
+                sessions={sidebarSessions}
+                onSelectSession={(sessionId) => handleOpenChat(sessionId)}
+            />
 
             {/* Delete confirmation */}
             <ConfirmModal
@@ -345,48 +437,88 @@ export default function AllChatsPage() {
                 confirmLabel="Delete"
                 confirmVariant="danger"
             />
+        </ChatAccentProvider>
+    );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Filter dropdown (single pill button matching the screenshot)
+// ────────────────────────────────────────────────────────────────────────────
+interface FilterMenuProps {
+    filter: FilterId;
+    counts: { all: number; pinned: number; archived: number };
+    onChange: (f: FilterId) => void;
+}
+
+function FilterMenu({ filter, counts, onChange }: FilterMenuProps) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const options: { id: FilterId; label: string; icon: React.ReactNode; count: number }[] = [
+        { id: 'all', label: 'All chats', icon: <Inbox className="h-3.5 w-3.5" />, count: counts.all },
+        { id: 'pinned', label: 'Pinned', icon: <Pin className="h-3.5 w-3.5 rotate-45" />, count: counts.pinned },
+        { id: 'archived', label: 'Archived', icon: <Archive className="h-3.5 w-3.5" />, count: counts.archived },
+    ];
+
+    const isActive = filter !== 'all';
+
+    return (
+        <div className="relative inline-block" ref={ref}>
+            <button
+                onClick={() => setOpen((o) => !o)}
+                className={cn(
+                    'inline-flex items-center gap-1.5 h-9 pl-3 pr-3 rounded-lg text-[13px] font-medium border transition-colors',
+                    isActive
+                        ? 'bg-white/[0.08] text-foreground border-white/[0.15]'
+                        : 'bg-white/[0.03] text-foreground border-white/[0.1] hover:bg-white/[0.06]'
+                )}
+            >
+                <ListFilter className="h-3.5 w-3.5" />
+                <span>{filter === 'all' ? 'Filter' : FILTER_LABEL[filter]}</span>
+                {isActive && <X className="h-3 w-3 ml-0.5 text-muted-foreground" onClick={(e) => { e.stopPropagation(); onChange('all'); }} />}
+            </button>
+
+            {open && (
+                <div className="absolute left-0 mt-1.5 min-w-[220px] z-30 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl py-1 overflow-hidden">
+                    {options.map((opt) => (
+                        <button
+                            key={opt.id}
+                            onClick={() => {
+                                onChange(opt.id);
+                                setOpen(false);
+                            }}
+                            className={cn(
+                                'w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors',
+                                filter === opt.id
+                                    ? 'text-foreground bg-white/[0.06]'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04]'
+                            )}
+                        >
+                            <span className="text-muted-foreground/80">{opt.icon}</span>
+                            <span className="flex-1 text-left">{opt.label}</span>
+                            <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                                {opt.count}
+                            </span>
+                            {filter === opt.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Filter chip
-// ────────────────────────────────────────────────────────────────────────────
-interface FilterChipProps {
-    active: boolean;
-    onClick: () => void;
-    icon: React.ReactNode;
-    label: string;
-    count: number;
-}
-
-function FilterChip({ active, onClick, icon, label, count }: FilterChipProps) {
-    return (
-        <button
-            onClick={onClick}
-            className={cn(
-                'inline-flex items-center gap-1.5 h-8 pl-2.5 pr-2 rounded-lg text-[13px] font-medium transition-colors border',
-                active
-                    ? 'bg-white/[0.1] text-foreground border-white/[0.15]'
-                    : 'bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border-white/[0.08]'
-            )}
-        >
-            {icon}
-            <span>{label}</span>
-            <span
-                className={cn(
-                    'ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded text-[10px] font-semibold',
-                    active ? 'bg-white/[0.15] text-foreground' : 'bg-white/[0.06] text-muted-foreground/80'
-                )}
-            >
-                {count}
-            </span>
-        </button>
-    );
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Sort menu
+// Sort menu (the "..." button to the right of the search bar)
 // ────────────────────────────────────────────────────────────────────────────
 function SortMenu({ sort, onChange }: { sort: SortId; onChange: (s: SortId) => void }) {
     const [open, setOpen] = useState(false);
@@ -404,21 +536,24 @@ function SortMenu({ sort, onChange }: { sort: SortId; onChange: (s: SortId) => v
     const options: { id: SortId; label: string }[] = [
         { id: 'recent', label: 'Most recent' },
         { id: 'oldest', label: 'Oldest first' },
-        { id: 'az', label: 'Title (A–Z)' },
+        { id: 'az', label: 'Title (A-Z)' },
     ];
-    const current = options.find((o) => o.id === sort);
 
     return (
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen((o) => !o)}
-                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-white/[0.08] transition-colors"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-lg bg-white/[0.03] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] border border-white/[0.08] transition-colors"
+                title="Sort"
+                aria-label="Sort"
             >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span>{current?.label}</span>
+                <MoreHorizontal className="h-4 w-4" />
             </button>
             {open && (
-                <div className="absolute right-0 mt-1.5 min-w-[160px] z-30 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl py-1 overflow-hidden">
+                <div className="absolute right-0 mt-1.5 min-w-[170px] z-30 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl py-1 overflow-hidden">
+                    <p className="px-3 py-1 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wide">
+                        Sort by
+                    </p>
                     {options.map((opt) => (
                         <button
                             key={opt.id}
@@ -433,7 +568,7 @@ function SortMenu({ sort, onChange }: { sort: SortId; onChange: (s: SortId) => v
                                     : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04]'
                             )}
                         >
-                            {opt.label}
+                            <span>{opt.label}</span>
                             {sort === opt.id && <Check className="h-3.5 w-3.5" />}
                         </button>
                     ))}
@@ -444,10 +579,11 @@ function SortMenu({ sort, onChange }: { sort: SortId; onChange: (s: SortId) => v
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Chat row
+// Chat row — three-column layout (Name | Project | Updated)
 // ────────────────────────────────────────────────────────────────────────────
 interface ChatRowProps {
     session: ChatSession;
+    user: { email?: string; user_metadata?: { full_name?: string; avatar_url?: string } } | null;
     isRenaming: boolean;
     renameValue: string;
     onRenameValueChange: (v: string) => void;
@@ -462,6 +598,7 @@ interface ChatRowProps {
 
 function ChatRow({
     session,
+    user,
     isRenaming,
     renameValue,
     onRenameValueChange,
@@ -505,31 +642,19 @@ function ChatRow({
         }
     };
 
-    return (
-        <li className="group relative">
-            <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors">
-                {/* Icon / pin marker */}
-                <div
-                    className={cn(
-                        'h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border',
-                        session.isPinned
-                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                            : session.isArchived
-                                ? 'bg-white/[0.04] border-white/[0.06] text-muted-foreground/60'
-                                : 'bg-white/[0.04] border-white/[0.06] text-muted-foreground'
-                    )}
-                >
-                    {session.isPinned ? (
-                        <Pin className="h-3.5 w-3.5 rotate-45" />
-                    ) : session.isArchived ? (
-                        <Archive className="h-3.5 w-3.5" />
-                    ) : (
-                        <MessageSquare className="h-3.5 w-3.5" />
-                    )}
-                </div>
+    const initial = (
+        user?.user_metadata?.full_name?.[0] ||
+        user?.email?.[0] ||
+        'U'
+    ).toUpperCase();
 
-                {/* Title + meta */}
-                <div className="flex-1 min-w-0">
+    const projectLabel = session.isArchived ? 'Archived' : 'Personal';
+
+    return (
+        <li className="group">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_220px_180px] items-center gap-3 md:gap-4 px-3 py-3 rounded-md hover:bg-white/[0.03] transition-colors">
+                {/* Name column */}
+                <div className="min-w-0">
                     {isRenaming ? (
                         <div className="flex items-center gap-1.5">
                             <input
@@ -543,7 +668,6 @@ function ChatRow({
                             <button
                                 onClick={onRenameSave}
                                 className="h-7 w-7 flex items-center justify-center rounded-md bg-white/[0.08] hover:bg-white/[0.12] text-foreground transition-colors"
-                                title="Save"
                                 aria-label="Save"
                             >
                                 <Check className="h-3.5 w-3.5" />
@@ -551,7 +675,6 @@ function ChatRow({
                             <button
                                 onClick={onRenameCancel}
                                 className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
-                                title="Cancel"
                                 aria-label="Cancel"
                             >
                                 <X className="h-3.5 w-3.5" />
@@ -562,100 +685,124 @@ function ChatRow({
                             onClick={onOpen}
                             className="block w-full text-left"
                         >
-                            <p className="text-[14px] font-medium text-foreground truncate">
-                                {session.title}
-                            </p>
-                            <p className="text-[11.5px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5">
-                                <span>Updated {formatRelativeTime(session.updatedAt)}</span>
-                                <span className="text-muted-foreground/30">·</span>
-                                <span>{formatChatDate(session.updatedAt)}</span>
+                            <span className="inline-flex items-center gap-1.5 max-w-full">
+                                <span className="text-[14px] text-foreground truncate">
+                                    {session.title}
+                                </span>
+                                {session.isPinned && (
+                                    <Star
+                                        className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400"
+                                        aria-label="Pinned"
+                                    />
+                                )}
+                            </span>
+                            {/* Mobile-only meta: project + time */}
+                            <p className="md:hidden text-[12px] text-muted-foreground/70 mt-0.5 flex items-center gap-2">
+                                <ProjectBadge label={projectLabel} archived={session.isArchived} />
+                                <span>·</span>
+                                <span>{formatRelativeTime(session.updatedAt)}</span>
                             </p>
                         </button>
                     )}
                 </div>
 
-                {/* Inline action buttons */}
-                {!isRenaming && (
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <IconButton
-                            title={session.isPinned ? 'Unpin' : 'Pin'}
-                            onClick={onTogglePin}
-                            active={session.isPinned}
-                        >
-                            <Pin className="h-3.5 w-3.5 rotate-45" />
-                        </IconButton>
-                        <IconButton title="Rename" onClick={onRenameStart}>
-                            <Pencil className="h-3.5 w-3.5" />
-                        </IconButton>
-                        <div className="relative" ref={menuRef}>
-                            <IconButton
-                                title="More"
-                                onClick={() => setMenuOpen((o) => !o)}
-                                active={menuOpen}
-                            >
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </IconButton>
-                            {menuOpen && (
-                                <div className="absolute right-0 top-full mt-1 min-w-[170px] z-30 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl py-1 overflow-hidden">
-                                    <MenuItem
-                                        onClick={() => {
-                                            onToggleArchive();
-                                            setMenuOpen(false);
-                                        }}
-                                        icon={
-                                            session.isArchived ? (
-                                                <ArchiveRestore className="h-3.5 w-3.5" />
-                                            ) : (
-                                                <Archive className="h-3.5 w-3.5" />
-                                            )
-                                        }
-                                        label={session.isArchived ? 'Unarchive' : 'Archive'}
-                                    />
-                                    <div className="my-1 h-px bg-white/[0.08]" />
-                                    <MenuItem
-                                        onClick={() => {
-                                            onDelete();
-                                            setMenuOpen(false);
-                                        }}
-                                        icon={<Trash2 className="h-3.5 w-3.5" />}
-                                        label="Delete"
-                                        danger
-                                    />
-                                </div>
-                            )}
-                        </div>
+                {/* Project column (desktop only) */}
+                <div className="hidden md:flex items-center min-w-0">
+                    <ProjectBadge label={projectLabel} archived={session.isArchived} />
+                </div>
+
+                {/* Updated + avatar + menu */}
+                <div className="flex items-center justify-end gap-2 md:gap-3">
+                    <span className="hidden md:inline text-[13px] text-muted-foreground tabular-nums whitespace-nowrap">
+                        {formatRelativeTime(session.updatedAt)}
+                    </span>
+                    <div
+                        className="hidden md:flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] border border-white/[0.1] text-[10px] font-semibold text-foreground"
+                        aria-hidden="true"
+                    >
+                        {initial}
                     </div>
-                )}
+
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpen((o) => !o);
+                            }}
+                            className={cn(
+                                'h-7 w-7 flex items-center justify-center rounded-md transition-colors',
+                                menuOpen
+                                    ? 'bg-white/[0.1] text-foreground opacity-100'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06] md:opacity-0 md:group-hover:opacity-100'
+                            )}
+                            aria-label="More actions"
+                        >
+                            <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                        {menuOpen && (
+                            <div className="absolute right-0 top-full mt-1 min-w-[180px] z-30 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl py-1 overflow-hidden">
+                                <MenuItem
+                                    onClick={() => {
+                                        onTogglePin();
+                                        setMenuOpen(false);
+                                    }}
+                                    icon={<Pin className="h-3.5 w-3.5 rotate-45" />}
+                                    label={session.isPinned ? 'Unpin' : 'Pin'}
+                                />
+                                <MenuItem
+                                    onClick={() => {
+                                        onRenameStart();
+                                        setMenuOpen(false);
+                                    }}
+                                    icon={<Pencil className="h-3.5 w-3.5" />}
+                                    label="Rename"
+                                />
+                                <MenuItem
+                                    onClick={() => {
+                                        onToggleArchive();
+                                        setMenuOpen(false);
+                                    }}
+                                    icon={
+                                        session.isArchived ? (
+                                            <ArchiveRestore className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <Archive className="h-3.5 w-3.5" />
+                                        )
+                                    }
+                                    label={session.isArchived ? 'Unarchive' : 'Archive'}
+                                />
+                                <div className="my-1 h-px bg-white/[0.08]" />
+                                <MenuItem
+                                    onClick={() => {
+                                        onDelete();
+                                        setMenuOpen(false);
+                                    }}
+                                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                                    label="Delete"
+                                    danger
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </li>
     );
 }
 
-function IconButton({
-    children,
-    onClick,
-    title,
-    active,
-}: {
-    children: React.ReactNode;
-    onClick: () => void;
-    title: string;
-    active?: boolean;
-}) {
+function ProjectBadge({ label, archived }: { label: string; archived: boolean }) {
     return (
-        <button
-            onClick={onClick}
-            title={title}
-            aria-label={title}
-            className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-md transition-colors',
-                active
-                    ? 'bg-white/[0.1] text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
+        <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground min-w-0">
+            {archived ? (
+                <CircleDashed className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+            ) : (
+                <Triangle
+                    className="h-3 w-3 shrink-0 fill-blue-400/80 text-blue-400/80"
+                    aria-hidden="true"
+                />
             )}
-        >
-            {children}
-        </button>
+            <span className="truncate">{label}</span>
+        </span>
     );
 }
 
@@ -705,9 +852,9 @@ function EmptyState({ filter, query }: { filter: FilterId; query: string }) {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
             <div className="h-12 w-12 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
-                <MessageSquare className="h-5 w-5 text-muted-foreground/60" />
+                <Inbox className="h-5 w-5 text-muted-foreground/60" />
             </div>
             <p className="text-[14px] font-medium text-foreground">{title}</p>
             <p className="text-[12.5px] text-muted-foreground/70 mt-1 max-w-xs">{subtitle}</p>
