@@ -558,6 +558,29 @@ export function useChat() {
         }
     }, [state.currentSessionId]);
 
+    /**
+     * Rename a chat session. Updates Supabase and the local sessions list
+     * optimistically. The trimmed title must be non-empty; otherwise no-op.
+     */
+    const renameSession = useCallback(async (sessionId: string, title: string) => {
+        const trimmed = title.trim();
+        if (!trimmed) return;
+
+        // Optimistic local update
+        setSessions((prev) =>
+            prev.map((s) => (s.id === sessionId ? { ...s, title: trimmed } : s))
+        );
+
+        const { error } = await (supabase as any)
+            .from('chat_sessions')
+            .update({ title: trimmed })
+            .eq('id', sessionId);
+
+        if (error) {
+            console.error('Failed to rename session:', error);
+        }
+    }, []);
+
     const loadModels = useCallback(async () => {
         try {
             const res = await fetch('/api/models');
@@ -609,6 +632,7 @@ export function useChat() {
         deleteSession,
         pinSession,
         archiveSession,
+        renameSession,
         abortRequest,
         loadSessions: () => user && loadSessions(user.id),
     };
