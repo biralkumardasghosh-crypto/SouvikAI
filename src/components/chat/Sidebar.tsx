@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Plus,
     MessageSquare,
@@ -17,6 +18,8 @@ import {
     Pin,
     Archive,
     Settings,
+    LayoutList,
+    Pencil,
 } from 'lucide-react';
 import {
     Button,
@@ -40,6 +43,7 @@ interface SidebarProps {
     onDeleteSession: (sessionId: string) => void;
     onPinSession: (sessionId: string) => void;
     onArchiveSession: (sessionId: string) => void;
+    onRenameSession?: (sessionId: string, title: string) => void;
     onSearch: () => void;
     /** Called when an archived chat is selected from Settings — loads it in the main view. */
     onOpenArchivedChat?: (sessionId: string) => void;
@@ -94,13 +98,17 @@ interface ChatListItemProps {
     onPin: () => void;
     onArchive: () => void;
     onDelete: () => void;
+    onRename?: (sessionId: string, title: string) => void;
 }
 
-function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete }: ChatListItemProps) {
+function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete, onRename }: ChatListItemProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState(session.title);
     const btnRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const renameInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!menuOpen) return;
@@ -116,6 +124,15 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete 
         return () => document.removeEventListener('mousedown', handler);
     }, [menuOpen]);
 
+    useEffect(() => {
+        if (isRenaming) {
+            requestAnimationFrame(() => {
+                renameInputRef.current?.focus();
+                renameInputRef.current?.select();
+            });
+        }
+    }, [isRenaming]);
+
     const openMenu = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (btnRef.current) {
@@ -125,33 +142,76 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete 
         setMenuOpen(o => !o);
     };
 
+    const startRename = () => {
+        setRenameValue(session.title);
+        setIsRenaming(true);
+    };
+
+    const commitRename = () => {
+        const trimmed = renameValue.trim();
+        if (trimmed && trimmed !== session.title && onRename) {
+            onRename(session.id, trimmed);
+        }
+        setIsRenaming(false);
+    };
+
+    const cancelRename = () => {
+        setRenameValue(session.title);
+        setIsRenaming(false);
+    };
+
     return (
         <>
             <div
                 className={cn(
-                    'group relative flex items-center gap-1.5 pl-2 pr-1 h-8 rounded-md cursor-pointer transition-colors duration-150 text-[13px]',
-                    isActive
-                        ? 'bg-white/10 text-foreground'
-                        : 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground'
+                    'group relative flex items-center gap-1.5 pl-2 pr-1 h-8 rounded-md transition-colors duration-150 text-[13px]',
+                    isRenaming
+                        ? 'bg-white/[0.08]'
+                        : isActive
+                            ? 'bg-white/10 text-foreground cursor-pointer'
+                            : 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground cursor-pointer'
                 )}
-                onClick={onSelect}
+                onClick={isRenaming ? undefined : onSelect}
             >
-                <span className="flex-1 min-w-0 truncate leading-none">{session.title}</span>
+                {isRenaming ? (
+                    <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                commitRename();
+                            } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                cancelRename();
+                            }
+                        }}
+                        onBlur={commitRename}
+                        onClick={(e) => e.stopPropagation()}
+                        maxLength={120}
+                        className="flex-1 min-w-0 bg-transparent text-foreground text-[13px] outline-none"
+                    />
+                ) : (
+                    <span className="flex-1 min-w-0 truncate leading-none">{session.title}</span>
+                )}
 
-                <button
-                    ref={btnRef}
-                    onClick={openMenu}
-                    className={cn(
-                        'shrink-0 h-6 w-6 flex items-center justify-center rounded transition-all',
-                        menuOpen
-                            ? 'bg-white/15 text-foreground opacity-100'
-                            : 'text-muted-foreground/70 hover:bg-white/10 hover:text-foreground opacity-0 group-hover:opacity-100',
-                        isActive && 'opacity-100'
-                    )}
-                    title="Options"
-                >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
+                {!isRenaming && (
+                    <button
+                        ref={btnRef}
+                        onClick={openMenu}
+                        className={cn(
+                            'shrink-0 h-6 w-6 flex items-center justify-center rounded transition-all',
+                            menuOpen
+                                ? 'bg-white/15 text-foreground opacity-100'
+                                : 'text-muted-foreground/70 hover:bg-white/10 hover:text-foreground opacity-0 group-hover:opacity-100',
+                            isActive && 'opacity-100'
+                        )}
+                        title="Options"
+                    >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
 
             {menuOpen && (
@@ -167,6 +227,15 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete 
                         <Pin className="h-3.5 w-3.5 rotate-45" />
                         {session.isPinned ? 'Unpin' : 'Pin'}
                     </button>
+                    {onRename && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); startRename(); setMenuOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                        </button>
+                    )}
                     <button
                         onClick={(e) => { e.stopPropagation(); onArchive(); setMenuOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
@@ -212,16 +281,23 @@ export function Sidebar({
     onDeleteSession,
     onPinSession,
     onArchiveSession,
+    onRenameSession,
     onSearch,
     onOpenArchivedChat,
     isMobileOpen = false,
     onMobileClose,
 }: SidebarProps) {
     const { user, signOut } = useAuth();
+    const router = useRouter();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(244);
     const [isDragging, setIsDragging] = useState(false);
+
+    const goToAllChats = useCallback(() => {
+        onMobileClose?.();
+        router.push('/chats');
+    }, [router, onMobileClose]);
     const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
     const initial = displayName.charAt(0).toUpperCase();
 
@@ -323,6 +399,18 @@ export function Sidebar({
 
                     <div className="h-px bg-white/[0.06] mx-2" />
 
+                    <div className="px-2 py-1.5">
+                        <button
+                            onClick={goToAllChats}
+                            className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                        >
+                            <LayoutList className="h-4 w-4 shrink-0" />
+                            <span className="flex-1 text-left">View all chats</span>
+                        </button>
+                    </div>
+
+                    <div className="h-px bg-white/[0.06] mx-2" />
+
                     <div className="p-2">
                         <UserMenu
                             user={user}
@@ -417,6 +505,7 @@ export function Sidebar({
                                                     onPin={() => onPinSession(session.id)}
                                                     onArchive={() => onArchiveSession(session.id)}
                                                     onDelete={() => onDeleteSession(session.id)}
+                                                    onRename={onRenameSession}
                                                 />
                                             ))}
                                         </div>
@@ -455,6 +544,25 @@ export function Sidebar({
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* ── View all chats ── */}
+                    <div className={cn('shrink-0 border-t border-white/[0.06]', isCollapsed ? 'p-1.5' : 'px-2 py-1.5')}>
+                        <button
+                            onClick={goToAllChats}
+                            title={isCollapsed ? 'View all chats' : undefined}
+                            className={cn(
+                                'w-full flex items-center text-[13px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors duration-150 rounded-md',
+                                isCollapsed
+                                    ? 'h-8 w-8 mx-auto justify-center'
+                                    : 'gap-2.5 px-2 h-8'
+                            )}
+                        >
+                            <LayoutList className="h-4 w-4 shrink-0" />
+                            {!isCollapsed && (
+                                <span className="flex-1 text-left">View all chats</span>
+                            )}
+                        </button>
                     </div>
 
                     {/* ── Footer: user menu ── */}

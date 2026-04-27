@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sidebar, ModelSelector, ChatContainer, ChatInput, SearchModal, ConfirmModal, QuotaBanner } from '@/components/chat';
 import { ChatAccentProvider } from '@/components/chat/ChatAccentProvider';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,12 +16,28 @@ interface PendingAction {
 }
 
 export default function ChatPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen flex items-center justify-center bg-[#212121]">
+                    <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+                </div>
+            }
+        >
+            <ChatPageInner />
+        </Suspense>
+    );
+}
+
+function ChatPageInner() {
     const { isLoading: authLoading, isAuthenticated } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [pendingMessage, setPendingMessage] = useState('');
+    const consumedSessionParamRef = useRef<string | null>(null);
 
     const {
         messages,
@@ -37,11 +53,27 @@ export default function ChatPage() {
         deleteSession,
         pinSession,
         archiveSession,
+        renameSession,
         abortRequest,
         selectedModelId,
         setSelectedModelId,
         isCurrentSessionArchived,
     } = useChat();
+
+    // ── Open chat from `?session=<id>` query param (used by /chats page) ──
+    useEffect(() => {
+        const sessionParam = searchParams.get('session');
+        if (
+            sessionParam &&
+            isAuthenticated &&
+            consumedSessionParamRef.current !== sessionParam
+        ) {
+            consumedSessionParamRef.current = sessionParam;
+            selectSession(sessionParam);
+            // Strip the query param so a refresh doesn't re-trigger selection.
+            router.replace('/');
+        }
+    }, [searchParams, isAuthenticated, selectSession, router]);
 
     // ── QUOTA CHECKING ──────────────────────────────────────────────────────────
     const quota = useQuota(selectedModelId, models);
@@ -111,6 +143,7 @@ export default function ChatPage() {
                 onDeleteSession={handleDeleteRequest}
                 onPinSession={pinSession}
                 onArchiveSession={handleArchiveRequest}
+                onRenameSession={renameSession}
                 onOpenArchivedChat={(sessionId) => {
                     // Load the archived session's messages in the main chat view
                     selectSession(sessionId);
