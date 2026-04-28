@@ -6,7 +6,7 @@ import {
     ChevronDown,
     Clock,
     FilePlus2,
-    FilePen,
+    FilePenLine,
     FileX2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -181,7 +181,7 @@ function describeAction(kind: 'create' | 'edit' | 'delete') {
         case 'create':
             return { Icon: FilePlus2, label: 'Created', color: 'text-emerald-500/85' };
         case 'edit':
-            return { Icon: FilePen, label: 'Edited', color: 'text-sky-500/85' };
+            return { Icon: FilePenLine, label: 'Edited', color: 'text-sky-500/85' };
         case 'delete':
             return { Icon: FileX2, label: 'Deleted', color: 'text-rose-500/85' };
     }

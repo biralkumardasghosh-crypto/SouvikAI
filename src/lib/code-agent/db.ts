@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { createClient } from '@/lib/supabase/server';
 import { Database } from '@/types/database';
 import type {
     BuilderFileAction,
@@ -10,7 +10,13 @@ import type {
 } from '@/types/code';
 import { BASE_TEMPLATE, DEFAULT_ACTIVE_FILE } from './template';
 
-type DB = SupabaseClient<Database>;
+/**
+ * The cookie-bound server Supabase client. Inferring from the factory keeps
+ * the schema generic in sync with whatever `createServerClient<Database>` is
+ * configured with — typing it manually as `SupabaseClient<Database>` collapses
+ * the table generics to `never` and breaks every `.insert()` / `.update()`.
+ */
+type DB = Awaited<ReturnType<typeof createClient>>;
 
 type WorkspaceRow = Database['public']['Tables']['builder_workspaces']['Row'];
 type FileRow = Database['public']['Tables']['builder_files']['Row'];
@@ -302,7 +308,7 @@ export async function insertBuilderMessage(
             user_id: args.userId,
             role: args.role,
             content: args.content,
-            steps: (args.steps ?? []) as unknown as never,
+            steps: (args.steps ?? []) as unknown as Database['public']['Tables']['builder_messages']['Insert']['steps'],
             errored: !!args.errored,
         })
         .select('id')
