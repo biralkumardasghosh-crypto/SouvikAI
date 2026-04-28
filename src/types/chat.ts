@@ -37,6 +37,14 @@ export interface ChatSession {
     isArchived: boolean;
     /** Optional project this chat belongs to. NULL = loose chat (top-level). */
     projectId: string | null;
+    /** When this chat was created via "Branch", the id of the source chat. */
+    branchedFromSessionId: string | null;
+    /**
+     * Snapshot of the source chat's title at the time of branching. Used to
+     * render the "Branched from <title>" divider; persists even if the
+     * source chat is later renamed or deleted.
+     */
+    branchedFromTitle: string | null;
 }
 
 export interface ChatState {

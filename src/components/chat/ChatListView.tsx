@@ -29,6 +29,7 @@ import {
     ListFilter,
     ChevronDown,
     Inbox,
+    GitBranch,
 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,11 @@ export interface ChatListViewProps {
     onToggleArchive: (sessionId: string) => Promise<void> | void;
     /** Parent owns the confirm flow; we just hand off the id + current title. */
     onDelete: (sessionId: string, title: string) => void;
+    /**
+     * Optional. Branch this chat — creates a new session that copies the
+     * existing message history. When omitted the menu item is hidden.
+     */
+    onBranch?: (sessionId: string) => void;
 
     /** Hide the "Project" column (used on the per-project page). */
     showProjectColumn?: boolean;
@@ -99,6 +105,7 @@ export function ChatListView({
     onTogglePin,
     onToggleArchive,
     onDelete,
+    onBranch,
     showProjectColumn = true,
     newChatLabel = 'New chat',
     searchPlaceholder = 'Search chats…',
@@ -267,6 +274,7 @@ export function ChatListView({
                                 onTogglePin={() => onTogglePin(session.id)}
                                 onToggleArchive={() => onToggleArchive(session.id)}
                                 onDelete={() => onDelete(session.id, session.title)}
+                                onBranch={onBranch ? () => onBranch(session.id) : undefined}
                                 showProjectColumn={showProjectColumn}
                                 sortLabel={SORT_LABEL[sort]}
                             />
@@ -476,6 +484,7 @@ interface ChatRowProps {
     onTogglePin: () => void;
     onToggleArchive: () => void;
     onDelete: () => void;
+    onBranch?: () => void;
     showProjectColumn: boolean;
     sortLabel: string;
 }
@@ -493,6 +502,7 @@ function ChatRow({
     onTogglePin,
     onToggleArchive,
     onDelete,
+    onBranch,
     showProjectColumn,
 }: ChatRowProps) {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -660,6 +670,16 @@ function ChatRow({
                                     icon={<Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />}
                                     label="Rename"
                                 />
+                                {onBranch && (
+                                    <MenuItem
+                                        onClick={() => {
+                                            onBranch();
+                                            setMenuOpen(false);
+                                        }}
+                                        icon={<GitBranch className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                                        label="Branch"
+                                    />
+                                )}
                                 <MenuItem
                                     onClick={() => {
                                         onToggleArchive();

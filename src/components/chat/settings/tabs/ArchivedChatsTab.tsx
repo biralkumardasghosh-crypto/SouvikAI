@@ -51,6 +51,8 @@ export function ArchivedChatsTab({ onOpenChat }: ArchivedChatsTabProps) {
                         isPinned: s.is_pinned ?? false,
                         isArchived: true,
                         projectId: s.project_id ?? null,
+                        branchedFromSessionId: s.branched_from_session_id ?? null,
+                        branchedFromTitle: s.branched_from_title ?? null,
                     }))
                 );
             }

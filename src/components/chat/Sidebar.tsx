@@ -20,6 +20,7 @@ import {
     Settings,
     LayoutList,
     Pencil,
+    GitBranch,
 } from 'lucide-react';
 import {
     Button,
@@ -50,6 +51,8 @@ interface SidebarProps {
     onPinSession: (sessionId: string) => void;
     onArchiveSession: (sessionId: string) => void;
     onRenameSession?: (sessionId: string, title: string) => void;
+    /** Branch this chat — creates a new session that copies the existing history. */
+    onBranchSession?: (sessionId: string) => void;
     onSearch: () => void;
     /** Called when an archived chat is selected from Settings — loads it in the main view. */
     onOpenArchivedChat?: (sessionId: string) => void;
@@ -110,9 +113,10 @@ interface ChatListItemProps {
     onArchive: () => void;
     onDelete: () => void;
     onRename?: (sessionId: string, title: string) => void;
+    onBranch?: () => void;
 }
 
-function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete, onRename }: ChatListItemProps) {
+function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete, onRename, onBranch }: ChatListItemProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
     const [isRenaming, setIsRenaming] = useState(false);
@@ -249,6 +253,15 @@ function ChatListItem({ session, isActive, onSelect, onPin, onArchive, onDelete,
                             Rename
                         </button>
                     )}
+                    {onBranch && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onBranch(); setMenuOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
+                        >
+                            <GitBranch className="h-3.5 w-3.5" />
+                            Branch
+                        </button>
+                    )}
                     <button
                         onClick={(e) => { e.stopPropagation(); onArchive(); setMenuOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
@@ -295,6 +308,7 @@ export function Sidebar({
     onPinSession,
     onArchiveSession,
     onRenameSession,
+    onBranchSession,
     onSearch,
     onOpenArchivedChat,
     isMobileOpen = false,
@@ -656,6 +670,7 @@ export function Sidebar({
                                                     onArchive={() => onArchiveSession(session.id)}
                                                     onDelete={() => onDeleteSession(session.id)}
                                                     onRename={onRenameSession}
+                                                    onBranch={onBranchSession ? () => onBranchSession(session.id) : undefined}
                                                 />
                                             ))}
                                         </div>

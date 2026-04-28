@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { createClient } from '@/lib/supabase/client';
+import { branchChatSession } from '@/lib/branch-chat';
 import { ChatAccentProvider } from '@/components/chat/ChatAccentProvider';
 import {
     Sidebar,
@@ -139,6 +140,8 @@ export default function ProjectPage() {
                 isPinned: s.is_pinned ?? false,
                 isArchived: s.is_archived ?? false,
                 projectId: s.project_id ?? null,
+                branchedFromSessionId: s.branched_from_session_id ?? null,
+                branchedFromTitle: s.branched_from_title ?? null,
             }));
             setChats(mapped);
         }
@@ -253,6 +256,21 @@ export default function ProjectPage() {
     const handleRequestDeleteChat = useCallback((sessionId: string, title: string) => {
         setPendingDeleteChat({ sessionId, title });
     }, []);
+
+    // Branch a chat in this project. Because branchChatSession copies the
+    // source's project_id, the new session stays in the same project. We
+    // optimistically prepend it to the local list so the user sees it before
+    // they navigate, then route to the home view where the divider renders.
+    const handleBranchChat = useCallback(
+        async (sessionId: string) => {
+            if (!user) return;
+            const branched = await branchChatSession(sessionId, user.id);
+            if (!branched) return;
+            setChats((prev) => [branched, ...prev]);
+            router.push(`/?session=${branched.id}`);
+        },
+        [user, router]
+    );
 
     const handleConfirmDeleteChat = useCallback(async () => {
         if (!pendingDeleteChat) return;
@@ -431,6 +449,7 @@ export default function ProjectPage() {
                                 onTogglePin={handleTogglePinChat}
                                 onToggleArchive={handleToggleArchiveChat}
                                 onDelete={handleRequestDeleteChat}
+                                onBranch={handleBranchChat}
                                 showProjectColumn={false}
                                 searchPlaceholder="Search chats in this project…"
                                 emptyTitle="No chats match your filters"

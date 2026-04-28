@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Menu } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { branchChatSession } from '@/lib/branch-chat';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatSession } from '@/types/chat';
 import {
@@ -66,6 +67,8 @@ export default function AllChatsPage() {
                 isPinned: s.is_pinned ?? false,
                 isArchived: s.is_archived ?? false,
                 projectId: s.project_id ?? null,
+                branchedFromSessionId: s.branched_from_session_id ?? null,
+                branchedFromTitle: s.branched_from_title ?? null,
             }));
             setSessions(mapped);
         }
@@ -147,6 +150,21 @@ export default function AllChatsPage() {
         [router]
     );
 
+    // Branch the chat then jump to it in the home view, where the
+    // "Branched from <title>" divider renders at the top.
+    const handleBranchChat = useCallback(
+        async (sessionId: string) => {
+            if (!user) return;
+            const branched = await branchChatSession(sessionId, user.id);
+            if (!branched) return;
+            // Optimistically inject the new session at the top so a quick
+            // back-navigation still shows it without a refresh.
+            setSessions((prev) => [branched, ...prev]);
+            router.push(`/?session=${branched.id}`);
+        },
+        [user, router]
+    );
+
     const handleNewChat = useCallback(() => {
         router.push('/');
     }, [router]);
@@ -180,6 +198,7 @@ export default function AllChatsPage() {
                 onPinSession={handleTogglePin}
                 onArchiveSession={handleToggleArchive}
                 onRenameSession={handleRename}
+                onBranchSession={handleBranchChat}
                 onOpenArchivedChat={(sessionId) => handleOpenChat(sessionId)}
                 isMobileOpen={isSidebarOpen}
                 onMobileClose={() => setIsSidebarOpen(false)}
@@ -222,6 +241,7 @@ export default function AllChatsPage() {
                             onTogglePin={handleTogglePin}
                             onToggleArchive={handleToggleArchive}
                             onDelete={handleDelete}
+                            onBranch={handleBranchChat}
                         />
                     </div>
                 </div>

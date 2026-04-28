@@ -4,6 +4,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getCachedSessionsPromise } from '@/lib/preload';
+import { branchChatSession } from '@/lib/branch-chat';
 import { Message, ChatSession, ChatState, AIModel } from '@/types/chat';
 import type { Attachment, AttachmentPayload, MessageAttachment } from '@/types/attachments';
 import { useAuth } from './useAuth';
@@ -35,6 +36,12 @@ export function useChat() {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [sessionsLoaded, setSessionsLoaded] = useState(false);
     const [isCurrentSessionArchived, setIsCurrentSessionArchived] = useState(false);
+    /**
+     * If the active chat was created via "Branch", this holds the snapshot
+     * of the source chat's title taken at branch time. The conversation view
+     * uses it to render the "Branched from <title>" divider at the top.
+     */
+    const [currentSessionBranchedFromTitle, setCurrentSessionBranchedFromTitle] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const loadingUserIdRef = useRef<string | null>(null);
     /**
@@ -56,6 +63,8 @@ export function useChat() {
                 isPinned: s.is_pinned ?? false,
                 isArchived: s.is_archived ?? false,
                 projectId: s.project_id ?? null,
+                branchedFromSessionId: s.branched_from_session_id ?? null,
+                branchedFromTitle: s.branched_from_title ?? null,
             }))
             .sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
@@ -115,13 +124,15 @@ export function useChat() {
             setState((prev) => ({ ...prev, messages, currentSessionId: sessionId }));
         }
 
-        // Also fetch whether this session is archived so we can show a banner
+        // Fetch session-level metadata used by the conversation view:
+        // archive banner + "Branched from …" divider.
         const { data: sessionData } = await (supabase as any)
             .from('chat_sessions')
-            .select('is_archived')
+            .select('is_archived, branched_from_title')
             .eq('id', sessionId)
             .single();
         setIsCurrentSessionArchived(sessionData?.is_archived ?? false);
+        setCurrentSessionBranchedFromTitle(sessionData?.branched_from_title ?? null);
     }, []);
 
     // Internal: creates a session in the DB. Called by sendMessage on first message.
@@ -156,6 +167,8 @@ export function useChat() {
                 isPinned: false,
                 isArchived: false,
                 projectId: data.project_id ?? null,
+                branchedFromSessionId: null,
+                branchedFromTitle: null,
             };
             setSessions((prev) => [newSession, ...prev]);
             setState((prev) => ({ ...prev, currentSessionId: data.id }));
@@ -184,6 +197,7 @@ export function useChat() {
             error: null,
         }));
         setIsCurrentSessionArchived(false);
+        setCurrentSessionBranchedFromTitle(null);
     }, []);
 
     const selectSession = useCallback(async (sessionId: string) => {
@@ -548,6 +562,8 @@ export function useChat() {
         setSessions((prev) => prev.filter((s) => s.id !== sessionId));
         if (state.currentSessionId === sessionId) {
             setState((prev) => ({ ...prev, messages: [], currentSessionId: null }));
+            setIsCurrentSessionArchived(false);
+            setCurrentSessionBranchedFromTitle(null);
         }
     }, [state.currentSessionId]);
 
@@ -578,8 +594,41 @@ export function useChat() {
         setSessions((prev) => prev.filter((s) => s.id !== sessionId));
         if (state.currentSessionId === sessionId) {
             setState((prev) => ({ ...prev, messages: [], currentSessionId: null }));
+            setIsCurrentSessionArchived(false);
+            setCurrentSessionBranchedFromTitle(null);
         }
     }, [state.currentSessionId]);
+
+    /**
+     * Branch the given chat into a new session.
+     *
+     * Creates a fresh session that snapshots the source's full message
+     * history at this moment, prepends it to the sidebar, then opens it so
+     * the user lands directly in the new branch with the
+     * "Branched from <title>" divider visible at the top of the conversation.
+     *
+     * Cancels any in-flight stream first so the active reader doesn't keep
+     * pushing tokens into a session the user just navigated away from.
+     */
+    const branchSession = useCallback(async (sessionId: string) => {
+        if (!user) return null;
+
+        // Stop the current stream — branching navigates the user away.
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
+        const branched = await branchChatSession(sessionId, user.id);
+        if (!branched) return null;
+
+        // Insert at the top of the sidebar so the user immediately sees it.
+        setSessions((prev) => [branched, ...prev]);
+
+        // Open the new branch in the main chat view.
+        await loadMessages(branched.id);
+        return branched.id;
+    }, [user, loadMessages]);
 
     /**
      * Rename a chat session. Updates Supabase and the local sessions list
@@ -648,6 +697,7 @@ export function useChat() {
         selectedModelId,
         setSelectedModelId,
         isCurrentSessionArchived,
+        currentSessionBranchedFromTitle,
         sendMessage,
         regenerateMessage,
         newChat,
@@ -656,6 +706,7 @@ export function useChat() {
         pinSession,
         archiveSession,
         renameSession,
+        branchSession,
         abortRequest,
         loadSessions: () => user && loadSessions(user.id),
     };

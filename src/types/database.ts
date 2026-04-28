@@ -44,6 +44,8 @@ export interface Database {
                     created_at: string;
                     updated_at: string;
                     project_id: string | null;
+                    branched_from_session_id: string | null;
+                    branched_from_title: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -52,6 +54,8 @@ export interface Database {
                     created_at?: string;
                     updated_at?: string;
                     project_id?: string | null;
+                    branched_from_session_id?: string | null;
+                    branched_from_title?: string | null;
                 };
                 Update: {
                     id?: string;
@@ -60,6 +64,8 @@ export interface Database {
                     created_at?: string;
                     updated_at?: string;
                     project_id?: string | null;
+                    branched_from_session_id?: string | null;
+                    branched_from_title?: string | null;
                 };
             };
             projects: {

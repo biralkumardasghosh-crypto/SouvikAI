@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { GitBranch } from 'lucide-react';
 import { ScrollArea } from '@/components/ui';
 import { Message } from '@/types/chat';
 import { MessageBubble } from './MessageBubble';
@@ -21,12 +22,19 @@ interface ChatContainerProps {
     /** Pre-fills the empty-state ChatInput (lifted from parent). */
     pendingMessage?: string;
     onPendingMessageConsumed?: () => void;
+    /**
+     * If the active session was created via "Branch", this is the snapshot
+     * of the source chat's title. The conversation view shows a divider at
+     * the very top: "Branched from <title>".
+     */
+    branchedFromTitle?: string | null;
 }
 
 export function ChatContainer({
     messages, isLoading, error,
     onSend, onStop, onRegenerate,
     onSuggestionSelect, pendingMessage, onPendingMessageConsumed,
+    branchedFromTitle,
 }: ChatContainerProps) {
     const { preferences } = useChatPreferences();
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -72,6 +80,24 @@ export function ChatContainer({
         <ScrollArea className="flex-1 h-full w-full">
             <div className="flex flex-col min-h-full w-full py-2 md:py-4">
                 <div className="flex-1 w-full max-w-full md:max-w-3xl mx-auto space-y-4 md:space-y-6 pb-4 px-1 md:px-0">
+                    {/* Branched-from divider — appears at the very top of a branched chat */}
+                    {branchedFromTitle && (
+                        <div
+                            className="flex items-center gap-3 px-4 md:px-2 pt-1 pb-1 mx-1 md:mx-2"
+                            role="separator"
+                            aria-label={`Branched from ${branchedFromTitle}`}
+                        >
+                            <div className="flex-1 h-px bg-border-subtle" />
+                            <div className="flex items-center gap-1.5 text-[11px] md:text-[12px] text-foreground-muted whitespace-nowrap">
+                                <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                                <span>Branched from</span>
+                                <span className="text-foreground font-medium truncate max-w-[180px] md:max-w-[280px]">
+                                    {branchedFromTitle}
+                                </span>
+                            </div>
+                            <div className="flex-1 h-px bg-border-subtle" />
+                        </div>
+                    )}
                     {messages.map((msg, index) => (
                         <MessageBubble
                             key={msg.id}

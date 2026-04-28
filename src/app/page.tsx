@@ -75,10 +75,12 @@ function ChatPageInner() {
         pinSession,
         archiveSession,
         renameSession,
+        branchSession,
         abortRequest,
         selectedModelId,
         setSelectedModelId,
         isCurrentSessionArchived,
+        currentSessionBranchedFromTitle,
     } = useChat();
 
     // ── Open chat from `?session=<id>` query param (used by /chats page) ──
@@ -225,6 +227,7 @@ function ChatPageInner() {
                 onPinSession={pinSession}
                 onArchiveSession={handleArchiveRequest}
                 onRenameSession={renameSession}
+                onBranchSession={branchSession}
                 onOpenArchivedChat={(sessionId) => {
                     // Load the archived session's messages in the main chat view
                     selectSession(sessionId);
@@ -300,6 +303,7 @@ function ChatPageInner() {
                         onSuggestionSelect={(prompt) => setPendingMessage(prompt)}
                         pendingMessage={pendingMessage}
                         onPendingMessageConsumed={() => setPendingMessage('')}
+                        branchedFromTitle={currentSessionBranchedFromTitle}
                     />
                 </div>
 
