@@ -546,7 +546,8 @@ async function persistAction(
     try {
         await applyFileAction(supabase, workspaceId, action);
     } catch (err) {
-        console.error('[Builder Agent] persist action failed:', action.kind, action.path, err);
+        const target = action.kind === 'rename' ? `${action.from} -> ${action.to}` : action.path;
+        console.error('[Builder Agent] persist action failed:', action.kind, target, err);
     }
 }
 
