@@ -124,13 +124,13 @@ export function buildPendingChanges(
     }
 
     // Compute the union of all paths that appeared on either side.
-    const paths = new Set<string>([
-        ...Object.keys(snapshot),
-        ...Object.keys(working),
-    ]);
+    // Build via an object to avoid Set-iteration target requirements.
+    const pathSet: Record<string, true> = {};
+    for (const k of Object.keys(snapshot)) pathSet[k] = true;
+    for (const k of Object.keys(working)) pathSet[k] = true;
 
     const out: PendingChange[] = [];
-    for (const path of paths) {
+    for (const path of Object.keys(pathSet)) {
         const before = path in snapshot ? snapshot[path] : null;
         const after = path in working ? working[path] : null;
         if (before === after) continue; // No net change.
