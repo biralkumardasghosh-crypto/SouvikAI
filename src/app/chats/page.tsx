@@ -95,6 +95,7 @@ export default function AllChatsPage() {
                 updatedAt: new Date(s.updated_at),
                 isPinned: s.is_pinned ?? false,
                 isArchived: s.is_archived ?? false,
+                projectId: s.project_id ?? null,
             }));
             setSessions(mapped);
         }
@@ -553,7 +554,7 @@ function FilterMenu({ filter, counts, onChange }: FilterMenuProps) {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Sort menu (text-labeled, not hidden behind ...)
-// ────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────��────────────────────────────────
 
 function SortMenu({
     sort,
