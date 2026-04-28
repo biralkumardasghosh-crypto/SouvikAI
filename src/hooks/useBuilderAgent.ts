@@ -399,6 +399,49 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                     return;
                 }
 
+                if (ev.type === 'action-start') {
+                    // Lightweight "I'm starting to write X" hint: insert a
+                    // doing-state action step so the timeline shows progress
+                    // while the file body is still streaming. The matching
+                    // `action` event will upgrade this same step to `done`
+                    // and apply the file change.
+                    setState((s) => {
+                        if (!s.workspace) return s;
+                        return {
+                            ...s,
+                            workspace: {
+                                ...s.workspace,
+                                updatedAt: Date.now(),
+                                messages: s.workspace.messages.map((m) => {
+                                    if (m.id !== msgId) return m;
+                                    const prevSteps = m.steps ?? [];
+                                    // Skip if we already have a doing step
+                                    // for this exact (kind,path) — defensive
+                                    // against a duplicate hint.
+                                    const dup = prevSteps.some(
+                                        (st) =>
+                                            st.kind === 'action' &&
+                                            st.status === 'doing' &&
+                                            (st.action.kind === ev.kind ||
+                                                (ev.kind === 'rename' &&
+                                                    st.action.kind === 'rename')) &&
+                                            actionPath(st.action) === ev.path,
+                                    );
+                                    if (dup) return m;
+                                    const placeholder: BuilderStep = {
+                                        id: genId('s'),
+                                        kind: 'action',
+                                        action: placeholderAction(ev.kind, ev.path),
+                                        status: 'doing',
+                                    };
+                                    return { ...m, steps: [...prevSteps, placeholder] };
+                                }),
+                            },
+                        };
+                    });
+                    return;
+                }
+
                 if (ev.type === 'action') {
                     setState((s) => {
                         if (!s.workspace) return s;
@@ -408,6 +451,7 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                             newFiles,
                             ev.action,
                         );
+                        const targetPath = actionPath(ev.action);
 
                         return {
                             ...s,
@@ -419,6 +463,32 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                                 messages: s.workspace.messages.map((m) => {
                                     if (m.id !== msgId) return m;
                                     const prevSteps = m.steps ?? [];
+
+                                    // Promote the most recent matching
+                                    // doing-action placeholder to done with
+                                    // the real action payload.
+                                    for (let i = prevSteps.length - 1; i >= 0; i--) {
+                                        const st = prevSteps[i];
+                                        if (
+                                            st.kind === 'action' &&
+                                            st.status === 'doing' &&
+                                            st.action.kind === ev.action.kind &&
+                                            actionPath(st.action) === targetPath
+                                        ) {
+                                            const upgraded: BuilderStep = {
+                                                ...st,
+                                                action: ev.action,
+                                                status: 'done',
+                                            };
+                                            const nextSteps = prevSteps.slice();
+                                            nextSteps[i] = upgraded;
+                                            return { ...m, steps: nextSteps };
+                                        }
+                                    }
+
+                                    // No placeholder existed (e.g. delete /
+                                    // rename emitted in self-closing form
+                                    // with no action-start hint) — append.
                                     const next: BuilderStep = {
                                         id: genId('s'),
                                         kind: 'action',
@@ -470,7 +540,47 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                     }));
                     return;
                 }
-                // 'done' is implicit — handled by the await returning.
+
+                if (ev.type === 'done') {
+                    // Unlock the input + stop the streaming caret as soon as
+                    // the model is done — don't wait for the server's
+                    // post-stream tail (final DB writes + assistant-message
+                    // persistence). The connection stays open for those, but
+                    // the user-facing UI is already responsive.
+                    setState((s) => {
+                        if (!s.workspace) return s;
+                        return {
+                            ...s,
+                            isStreaming: false,
+                            workspace: {
+                                ...s.workspace,
+                                updatedAt: Date.now(),
+                                messages: s.workspace.messages.map((m) => {
+                                    if (m.id !== msgId) return m;
+                                    return {
+                                        ...m,
+                                        isStreaming: false,
+                                        steps: (m.steps ?? []).map((st) => {
+                                            if (st.kind === 'milestone' && st.status === 'doing') {
+                                                return { ...st, status: 'done' as const };
+                                            }
+                                            // Any straggler doing-action
+                                            // placeholders without a matching
+                                            // `action` event are flushed to
+                                            // done so the timeline doesn't
+                                            // shimmer forever.
+                                            if (st.kind === 'action' && st.status === 'doing') {
+                                                return { ...st, status: 'done' as const };
+                                            }
+                                            return st;
+                                        }),
+                                    };
+                                }),
+                            },
+                        };
+                    });
+                    return;
+                }
             }
         },
         [state.isStreaming, state.selectedModelId, workspaceId, updateAssistantMessage],

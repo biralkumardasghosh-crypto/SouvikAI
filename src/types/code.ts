@@ -27,7 +27,13 @@ export type BuilderFileAction =
  */
 export type BuilderStep =
     | { id: string; kind: 'milestone'; text: string; status: 'doing' | 'done' }
-    | { id: string; kind: 'action'; action: BuilderFileAction; status: 'done' }
+    | {
+          id: string;
+          kind: 'action';
+          action: BuilderFileAction;
+          /** `doing` while the action body is still streaming, `done` once applied. */
+          status: 'doing' | 'done';
+      }
     | { id: string; kind: 'read'; path: string; status: 'done' };
 
 /** A single message in the builder conversation. */
@@ -47,6 +53,15 @@ export interface BuilderMessage {
 
 /** Server-streamed event shape (NDJSON). */
 export type BuilderStreamEvent =
+    /**
+     * Lightweight "I'm starting to write file X" hint emitted as soon as the
+     * agent's `<action>` open tag (with attributes) finishes streaming. The
+     * client uses this to surface an in-progress entry in the timeline while
+     * the action body is still streaming, instead of waiting for the entire
+     * `</action>` close tag before showing anything. The matching `action`
+     * event lands when the body and close tag are fully received.
+     */
+    | { type: 'action-start'; kind: BuilderFileAction['kind']; path: string }
     | { type: 'milestone'; text: string }
     | { type: 'action'; action: BuilderFileAction }
     | { type: 'read'; path: string }

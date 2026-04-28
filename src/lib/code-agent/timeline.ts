@@ -80,6 +80,9 @@ export function createTurnAccumulator(
                 this.text += ev.delta;
                 return;
             }
+            // `action-start` is a UI-only hint — the timeline gets the full
+            // record from the `action` event once the body lands.
+            if (ev.type === 'action-start') return;
             if (ev.type === 'milestone') {
                 this.closeOpenMilestone();
                 this.steps.push({
