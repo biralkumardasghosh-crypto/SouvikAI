@@ -140,6 +140,90 @@ export interface Database {
                     status?: 'completed' | 'failed' | 'aborted';
                 };
             };
+            builder_workspaces: {
+                Row: {
+                    id: string;
+                    user_id: string;
+                    title: string;
+                    active_file: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    user_id: string;
+                    title?: string;
+                    active_file?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    user_id?: string;
+                    title?: string;
+                    active_file?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
+            builder_files: {
+                Row: {
+                    id: string;
+                    workspace_id: string;
+                    path: string;
+                    content: string;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    workspace_id: string;
+                    path: string;
+                    content?: string;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    workspace_id?: string;
+                    path?: string;
+                    content?: string;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
+            builder_messages: {
+                Row: {
+                    id: string;
+                    workspace_id: string;
+                    user_id: string;
+                    role: 'user' | 'assistant';
+                    content: string;
+                    steps: unknown;
+                    errored: boolean;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    workspace_id: string;
+                    user_id: string;
+                    role: 'user' | 'assistant';
+                    content?: string;
+                    steps?: unknown;
+                    errored?: boolean;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    workspace_id?: string;
+                    user_id?: string;
+                    role?: 'user' | 'assistant';
+                    content?: string;
+                    steps?: unknown;
+                    errored?: boolean;
+                    created_at?: string;
+                };
+            };
             admin_settings: {
                 Row: {
                     id: number;

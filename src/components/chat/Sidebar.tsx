@@ -68,9 +68,9 @@ const STICKY_NAV_ITEMS = [
 
 // Lives inside the scrollable region — scrolls together with the chat list.
 const SCROLLABLE_NAV_ITEMS = [
-    { icon: ImageIcon, label: 'Images', action: 'images' as const },
-    { icon: Grid2X2, label: 'Apps', action: 'apps' as const },
-    { icon: Code2, label: 'Codex', action: 'codex' as const },
+    { icon: ImageIcon, label: 'Images', action: 'images' as const, href: undefined as string | undefined },
+    { icon: Grid2X2, label: 'Apps', action: 'apps' as const, href: undefined as string | undefined },
+    { icon: Code2, label: 'Forge', action: 'forge' as const, href: '/code' as string | undefined },
 ];
 
 // ── Group chats by recency ──────────────────────────────────────────────────
@@ -442,9 +442,16 @@ export function Sidebar({
                         <nav className="space-y-0.5 mb-3">
                             {SCROLLABLE_NAV_ITEMS.map((item) => {
                                 const Icon = item.icon;
+                                const handleClick = () => {
+                                    if (item.href) {
+                                        onMobileClose?.();
+                                        router.push(item.href);
+                                    }
+                                };
                                 return (
                                     <button
                                         key={item.action}
+                                        onClick={handleClick}
                                         className="w-full flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
@@ -613,6 +620,9 @@ export function Sidebar({
                         >
                             {SCROLLABLE_NAV_ITEMS.map((item) => {
                                 const Icon = item.icon;
+                                const handleClick = () => {
+                                    if (item.href) router.push(item.href);
+                                };
                                 return (
                                     <SimpleTooltip
                                         key={item.action}
@@ -621,6 +631,7 @@ export function Sidebar({
                                         disabled={!isCollapsed}
                                     >
                                         <button
+                                            onClick={handleClick}
                                             aria-label={item.label}
                                             className={cn(
                                                 'w-full flex items-center text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors duration-150 rounded-md',
