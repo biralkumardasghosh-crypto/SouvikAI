@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
     Plus,
     MessageSquare,
@@ -32,9 +32,14 @@ import {
     SimpleTooltip,
 } from '@/components/ui';
 import { ChatSession } from '@/types/chat';
+import type { Project } from '@/types/projects';
 import { useAuth } from '@/hooks/useAuth';
+import { useProjects } from '@/hooks/useProjects';
 import { cn } from '@/lib/utils';
 import { SettingsModal } from '@/components/chat/settings/SettingsModal';
+import { ProjectsSection } from '@/components/chat/ProjectsSection';
+import { ProjectModal } from '@/components/chat/ProjectModal';
+import { ConfirmModal } from '@/components/chat/ConfirmModal';
 
 interface SidebarProps {
     sessions: ChatSession[];
@@ -313,7 +318,52 @@ export function Sidebar({
     const MAX_WIDTH = 420;
     const COLLAPSED_WIDTH = 56;
 
-    const groups = useMemo(() => groupSessions(sessions), [sessions]);
+    // Sessions that belong to a project are listed inside that project's page.
+    // The main sidebar list shows only "loose" (top-level) chats so the same
+    // chat never appears twice.
+    const looseSessions = useMemo(
+        () => sessions.filter((s) => !s.projectId),
+        [sessions]
+    );
+    const groups = useMemo(() => groupSessions(looseSessions), [looseSessions]);
+
+    // ── Projects state ──────────────────────────────────────────────────
+    const pathname = usePathname();
+    const activeProjectId = useMemo(() => {
+        const match = pathname?.match(/^\/projects\/([^/]+)/);
+        return match ? match[1] : null;
+    }, [pathname]);
+
+    const { projects, createProject, renameProject, deleteProject } = useProjects();
+    const [createOpen, setCreateOpen] = useState(false);
+    const [renameTarget, setRenameTarget] = useState<Project | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+
+    const handleSelectProject = useCallback((id: string) => {
+        onMobileClose?.();
+        router.push(`/projects/${id}`);
+    }, [router, onMobileClose]);
+
+    const handleCreateSubmit = useCallback(async (name: string) => {
+        const project = await createProject(name);
+        if (project) {
+            // Drop the user straight into their new (empty) project.
+            router.push(`/projects/${project.id}`);
+            onMobileClose?.();
+        }
+    }, [createProject, router, onMobileClose]);
+
+    const handleRenameSubmit = useCallback(async (name: string) => {
+        if (renameTarget) await renameProject(renameTarget.id, name);
+    }, [renameTarget, renameProject]);
+
+    const handleDeleteConfirm = useCallback(() => {
+        if (!deleteTarget) return;
+        const id = deleteTarget.id;
+        // If we're currently viewing the project being deleted, navigate home.
+        if (activeProjectId === id) router.push('/');
+        void deleteProject(id);
+    }, [deleteTarget, deleteProject, activeProjectId, router]);
 
     const startDrag = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
@@ -389,6 +439,15 @@ export function Sidebar({
                                 );
                             })}
                         </nav>
+
+                        <ProjectsSection
+                            projects={projects}
+                            activeProjectId={activeProjectId}
+                            onCreateProject={() => setCreateOpen(true)}
+                            onSelectProject={handleSelectProject}
+                            onRenameProject={setRenameTarget}
+                            onDeleteProject={setDeleteTarget}
+                        />
 
                         {groups.map((group) => (
                             <div key={group.label} className="mb-3 last:mb-0">
@@ -566,6 +625,19 @@ export function Sidebar({
                             })}
                         </nav>
 
+                        {!isCollapsed && (
+                            <div className="px-2 pb-1">
+                                <ProjectsSection
+                                    projects={projects}
+                                    activeProjectId={activeProjectId}
+                                    onCreateProject={() => setCreateOpen(true)}
+                                    onSelectProject={handleSelectProject}
+                                    onRenameProject={setRenameTarget}
+                                    onDeleteProject={setDeleteTarget}
+                                />
+                            </div>
+                        )}
+
                         {!isCollapsed && groups.length > 0 && (
                             <div className="px-2 pb-2">
                                 {groups.map((group) => (
@@ -677,6 +749,38 @@ export function Sidebar({
             </div>
 
             <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} onOpenArchivedChat={onOpenArchivedChat} />
+
+            {/* Create new project */}
+            <ProjectModal
+                open={createOpen}
+                mode="create"
+                onClose={() => setCreateOpen(false)}
+                onSubmit={handleCreateSubmit}
+            />
+
+            {/* Rename project */}
+            <ProjectModal
+                open={renameTarget !== null}
+                mode="rename"
+                initialName={renameTarget?.name ?? ''}
+                onClose={() => setRenameTarget(null)}
+                onSubmit={handleRenameSubmit}
+            />
+
+            {/* Delete project confirmation */}
+            <ConfirmModal
+                open={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Delete project?"
+                description={
+                    deleteTarget
+                        ? `“${deleteTarget.name}” will be deleted. Chats inside this project will be moved back to your main chat list — they won't be deleted.`
+                        : ''
+                }
+                confirmLabel="Delete"
+                confirmVariant="danger"
+            />
         </>
     );
 }

@@ -43,6 +43,7 @@ export interface Database {
                     title: string;
                     created_at: string;
                     updated_at: string;
+                    project_id: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -50,11 +51,36 @@ export interface Database {
                     title?: string;
                     created_at?: string;
                     updated_at?: string;
+                    project_id?: string | null;
                 };
                 Update: {
                     id?: string;
                     user_id?: string;
                     title?: string;
+                    created_at?: string;
+                    updated_at?: string;
+                    project_id?: string | null;
+                };
+            };
+            projects: {
+                Row: {
+                    id: string;
+                    user_id: string;
+                    name: string;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    user_id: string;
+                    name: string;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    user_id?: string;
+                    name?: string;
                     created_at?: string;
                     updated_at?: string;
                 };

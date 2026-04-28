@@ -37,6 +37,12 @@ export function useChat() {
     const [isCurrentSessionArchived, setIsCurrentSessionArchived] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const loadingUserIdRef = useRef<string | null>(null);
+    /**
+     * The project id to attach to the NEXT lazily-created session.
+     * Set via `newChat(projectId)`; consumed (cleared) once `createSessionInDB`
+     * uses it so subsequent new chats default back to no project.
+     */
+    const pendingProjectIdRef = useRef<string | null>(null);
 
     const mapSessionData = useCallback((data: any[]): ChatSession[] => {
         return data
@@ -49,6 +55,7 @@ export function useChat() {
                 updatedAt: new Date(s.updated_at),
                 isPinned: s.is_pinned ?? false,
                 isArchived: s.is_archived ?? false,
+                projectId: s.project_id ?? null,
             }))
             .sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
@@ -121,9 +128,20 @@ export function useChat() {
     const createSessionInDB = useCallback(async (): Promise<string | null> => {
         if (!user) return null;
 
+        // Consume the pending project id (if any). Each "New chat" intent
+        // sets this once; the very next session creation picks it up.
+        const projectId = pendingProjectIdRef.current;
+        pendingProjectIdRef.current = null;
+
+        const insertPayload: { user_id: string; title: string; project_id?: string | null } = {
+            user_id: user.id,
+            title: 'New Chat',
+        };
+        if (projectId) insertPayload.project_id = projectId;
+
         const result: any = await (supabase as any)
             .from('chat_sessions')
-            .insert({ user_id: user.id, title: 'New Chat' })
+            .insert(insertPayload)
             .select()
             .single();
 
@@ -137,6 +155,7 @@ export function useChat() {
                 updatedAt: new Date(data.updated_at),
                 isPinned: false,
                 isArchived: false,
+                projectId: data.project_id ?? null,
             };
             setSessions((prev) => [newSession, ...prev]);
             setState((prev) => ({ ...prev, currentSessionId: data.id }));
@@ -147,12 +166,16 @@ export function useChat() {
 
     // Public: resets the UI to a blank slate and aborts any in-flight stream.
     // The session is created lazily when the first message is sent.
-    const newChat = useCallback(() => {
+    //
+    // Pass `projectId` to attach the next created session to a project — used
+    // by the "New chat" button on the project page.
+    const newChat = useCallback((projectId?: string | null) => {
         // Cancel the active stream so it stops consuming API quota.
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
+        pendingProjectIdRef.current = projectId ?? null;
         setState((prev) => ({
             ...prev,
             messages: [],

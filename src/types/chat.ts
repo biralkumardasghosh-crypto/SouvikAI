@@ -35,6 +35,8 @@ export interface ChatSession {
     updatedAt: Date;
     isPinned: boolean;
     isArchived: boolean;
+    /** Optional project this chat belongs to. NULL = loose chat (top-level). */
+    projectId: string | null;
 }
 
 export interface ChatState {
