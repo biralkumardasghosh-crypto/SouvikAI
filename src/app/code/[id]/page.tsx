@@ -30,6 +30,8 @@ export default function BuilderWorkspacePage() {
         sendMessage,
         resumePending,
         abort,
+        acceptChanges,
+        rejectChanges,
     } = useBuilderAgent(workspaceId);
 
     // Auth gate.
@@ -120,6 +122,8 @@ export default function BuilderWorkspacePage() {
             onUpdateFile={updateFile}
             onSend={sendMessage}
             onStop={abort}
+            onAcceptChanges={acceptChanges}
+            onRejectChanges={rejectChanges}
         />
     );
 }

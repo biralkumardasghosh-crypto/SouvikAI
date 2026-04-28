@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { Button, SimpleTooltip } from '@/components/ui';
 import { BuilderChatPanel } from './BuilderChatPanel';
 import { CodeEditor } from './CodeEditor';
 import { CodePreview } from './CodePreview';
+import { DiffPanel } from './DiffPanel';
 import { FileTree } from './FileTree';
 import { ViewToggle, type WorkspaceView } from './ViewToggle';
 import type { BuilderFiles, BuilderMessage } from '@/types/code';
@@ -27,6 +28,8 @@ interface CodeWorkspaceProps {
     onUpdateFile: (path: string, content: string) => void;
     onSend: (text: string) => void;
     onStop: () => void;
+    onAcceptChanges: (messageId: string, paths?: string[] | null) => Promise<void>;
+    onRejectChanges: (messageId: string, paths?: string[] | null) => Promise<void>;
 }
 
 const CHAT_WIDTH_STORAGE_KEY = 'forge:chatPanelWidth';
@@ -59,6 +62,34 @@ function clampWidth(width: number, viewport: number): number {
 export function CodeWorkspace(props: CodeWorkspaceProps) {
     const [view, setView] = useState<WorkspaceView>('editor');
     const [mobileTab, setMobileTab] = useState<'chat' | 'right'>('chat');
+
+    // Total pending changes across all assistant messages — drives the
+    // "Review" tab badge.
+    const pendingReviewCount = useMemo(() => {
+        let n = 0;
+        for (const m of props.messages) {
+            n += m.review?.pending.length ?? 0;
+        }
+        return n;
+    }, [props.messages]);
+
+    // If the Review tab is open and the queue empties, fall back to
+    // the editor so the user isn't stranded on an empty surface.
+    useEffect(() => {
+        if (view === 'review' && pendingReviewCount === 0) {
+            setView('editor');
+        }
+    }, [view, pendingReviewCount]);
+
+    /**
+     * Called by the chat panel when the user clicks "Review" on an
+     * assistant message banner. Switches the right pane to the diff
+     * view (and on mobile flips to the right tab so it's visible).
+     */
+    const handleOpenReview = useCallback(() => {
+        setView('review');
+        setMobileTab('right');
+    }, []);
 
     // ── Resizable left pane ────────────────────────────────────────────────
     const [isDesktop, setIsDesktop] = useState(false);
@@ -302,6 +333,7 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                         onModelChange={props.onModelChange}
                         onSend={props.onSend}
                         onStop={props.onStop}
+                        onOpenReview={handleOpenReview}
                     />
                 </aside>
 
@@ -344,13 +376,19 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                     )}
                 >
                     <div className="shrink-0 flex items-center justify-between gap-2 h-11 px-3 border-b border-border-subtle bg-background">
-                        <ViewToggle value={view} onChange={setView} />
+                        <ViewToggle
+                            value={view}
+                            onChange={setView}
+                            reviewCount={pendingReviewCount}
+                        />
                         <span className="text-[11px] text-foreground-subtle">
-                            {Object.keys(props.files).length} files
+                            {view === 'review'
+                                ? `${pendingReviewCount} pending`
+                                : `${Object.keys(props.files).length} files`}
                         </span>
                     </div>
 
-                    {view === 'editor' ? (
+                    {view === 'editor' && (
                         <div className="flex-1 min-h-0 flex">
                             <div className="w-[220px] shrink-0 border-r border-border-subtle bg-surface overflow-y-auto">
                                 <FileTree
@@ -369,8 +407,14 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                                 />
                             </div>
                         </div>
-                    ) : (
-                        <CodePreview files={props.files} />
+                    )}
+                    {view === 'preview' && <CodePreview files={props.files} />}
+                    {view === 'review' && (
+                        <DiffPanel
+                            messages={props.messages}
+                            onAccept={props.onAcceptChanges}
+                            onReject={props.onRejectChanges}
+                        />
                     )}
                 </section>
             </div>

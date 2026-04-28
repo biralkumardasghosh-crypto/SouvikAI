@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+    BuilderFileAction,
+    BuilderFiles,
     BuilderMessage,
     BuilderStep,
     BuilderStreamEvent,
     BuilderWorkspace,
+    PendingChange,
 } from '@/types/code';
 import { consumeNDJSONStream } from '@/lib/streaming/ndjson';
 import {
     applyAction,
+    buildPendingChanges,
     deriveWorkspaceTitle,
     genId,
     nextActiveFile,
@@ -50,6 +54,21 @@ export interface UseBuilderAgentResult {
      */
     resumePending: () => Promise<void>;
     abort: () => void;
+    /**
+     * Mark the given paths from a message's pending review as accepted.
+     * Pass `paths = null` (the default) to accept every remaining change
+     * for that message. Server already has the streamed result, so this
+     * just clears the entries from the review queue.
+     */
+    acceptChanges: (messageId: string, paths?: string[] | null) => Promise<void>;
+    /**
+     * Roll back the given paths from a message's pending review. The
+     * client `files` map is restored to the snapshot that was captured
+     * when the agent's turn began, and the workspace files API is
+     * called to revert the on-disk state too. Pass `paths = null` to
+     * reject every remaining change.
+     */
+    rejectChanges: (messageId: string, paths?: string[] | null) => Promise<void>;
 }
 
 const PLACEHOLDER_WORKSPACE = (id: string): BuilderWorkspace => ({
@@ -89,6 +108,16 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
     const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
     // Debounced active-file save timer.
     const activeFileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    /**
+     * Snapshot of `files` taken at the start of each agent turn, keyed by
+     * the assistant message id. Survives the lifetime of the workspace so
+     * "reject" still works on older messages within the session. Cleared
+     * when every pending change for a message has been resolved.
+     */
+    const turnSnapshotsRef = useRef<Map<string, BuilderFiles>>(new Map());
+    /** Per-turn list of file actions, accumulated as the stream arrives. */
+    const turnActionsRef = useRef<BuilderFileAction[]>([]);
 
     // ── Hydration ────────────────────────────────────────────────────────────
 
@@ -247,6 +276,132 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
         setState((s) => ({ ...s, isStreaming: false }));
     }, []);
 
+    // ── Diff review (accept / reject) ────────────────────────────────────────
+
+    /** Strip resolved entries (or all of them) from a message's review. */
+    const consumePending = useCallback(
+        (
+            messageId: string,
+            paths: string[] | null,
+        ): PendingChange[] => {
+            const ws = workspaceRef.current;
+            if (!ws) return [];
+            const message = ws.messages.find((m) => m.id === messageId);
+            if (!message?.review) return [];
+            const targetSet = paths === null ? null : new Set(paths);
+            const taken: PendingChange[] = [];
+            const remaining: PendingChange[] = [];
+            for (const change of message.review.pending) {
+                if (targetSet === null || targetSet.has(change.path)) {
+                    taken.push(change);
+                } else {
+                    remaining.push(change);
+                }
+            }
+            if (taken.length === 0) return [];
+
+            setState((s) => {
+                if (!s.workspace) return s;
+                return {
+                    ...s,
+                    workspace: {
+                        ...s.workspace,
+                        updatedAt: Date.now(),
+                        messages: s.workspace.messages.map((m) => {
+                            if (m.id !== messageId || !m.review) return m;
+                            return {
+                                ...m,
+                                review:
+                                    remaining.length > 0
+                                        ? { ...m.review, pending: remaining }
+                                        : undefined,
+                            };
+                        }),
+                    },
+                };
+            });
+
+            // If nothing is left to review, the snapshot has served
+            // its purpose.
+            if (remaining.length === 0) {
+                turnSnapshotsRef.current.delete(messageId);
+            }
+            return taken;
+        },
+        [],
+    );
+
+    const acceptChanges = useCallback(
+        async (messageId: string, paths: string[] | null = null) => {
+            // Server already has the streamed result and `files` was
+            // updated optimistically as the agent worked, so accepting
+            // is purely a bookkeeping step.
+            consumePending(messageId, paths);
+        },
+        [consumePending],
+    );
+
+    const rejectChanges = useCallback(
+        async (messageId: string, paths: string[] | null = null) => {
+            const taken = consumePending(messageId, paths);
+            if (taken.length === 0) return;
+
+            // Apply the rollback to the local file map first so the
+            // editor / preview update immediately, then mirror the
+            // change to the server.
+            setState((s) => {
+                if (!s.workspace) return s;
+                const nextFiles: BuilderFiles = { ...s.workspace.files };
+                for (const change of taken) {
+                    if (change.before === null) {
+                        delete nextFiles[change.path];
+                    } else {
+                        nextFiles[change.path] = change.before;
+                    }
+                }
+                let activeFile = s.workspace.activeFile;
+                if (activeFile && !(activeFile in nextFiles)) {
+                    activeFile = Object.keys(nextFiles)[0] ?? null;
+                }
+                return {
+                    ...s,
+                    workspace: {
+                        ...s.workspace,
+                        files: nextFiles,
+                        activeFile,
+                        updatedAt: Date.now(),
+                    },
+                };
+            });
+
+            // Cancel any debounced auto-save that might overwrite the
+            // restored content with the now-stale streamed value.
+            for (const change of taken) {
+                const pending = saveTimersRef.current.get(change.path);
+                if (pending) {
+                    clearTimeout(pending);
+                    saveTimersRef.current.delete(change.path);
+                }
+            }
+
+            // Mirror the rollback to Supabase. We deliberately do NOT
+            // await each one — the user's editor is already showing
+            // the reverted state and these calls just bring the server
+            // in line. Errors are logged inside the helpers.
+            await Promise.all(
+                taken.map((change) => {
+                    if (change.before === null) {
+                        return deleteWorkspaceFile(workspaceId, change.path);
+                    }
+                    // Fire-and-forget save; helper swallows errors.
+                    saveFile(workspaceId, change.path, change.before);
+                    return Promise.resolve();
+                }),
+            );
+        },
+        [consumePending, workspaceId],
+    );
+
     // ── Streaming send ───────────────────────────────────────────────────────
 
     const runAgent = useCallback(
@@ -275,6 +430,13 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                 isStreaming: true,
                 createdAt: Date.now() + 1,
             };
+
+            // Snapshot the current files BEFORE we mount the new
+            // assistant message — anything the stream applies will be
+            // diffed against this baseline. Stored on a ref so the
+            // accept/reject handlers can later restore from it.
+            turnSnapshotsRef.current.set(assistantMsg.id, { ...ws.files });
+            turnActionsRef.current = [];
 
             setState((s) => {
                 if (!s.workspace) return s;
@@ -327,7 +489,18 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                     handleStreamEvent(ev, assistantMsg.id);
                 });
 
-                // Stream completed cleanly.
+                // Stream completed cleanly. Compute the review queue
+                // from the snapshot + the turn's accumulated actions so
+                // the user can audit / accept / reject each file.
+                const snapshot = turnSnapshotsRef.current.get(assistantMsg.id);
+                const pending: PendingChange[] = snapshot
+                    ? buildPendingChanges(snapshot, turnActionsRef.current)
+                    : [];
+                if (pending.length === 0) {
+                    // Nothing to review — drop the snapshot to keep
+                    // memory tidy.
+                    turnSnapshotsRef.current.delete(assistantMsg.id);
+                }
                 updateAssistantMessage(assistantMsg.id, (m) => ({
                     ...m,
                     isStreaming: false,
@@ -336,13 +509,32 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                             ? { ...s, status: 'done' }
                             : s,
                     ),
+                    review:
+                        pending.length > 0
+                            ? { pending, total: pending.length }
+                            : undefined,
                 }));
             } catch (err) {
+                // The turn ended early — but the agent may have already
+                // applied a few actions before it failed/aborted.
+                // Compute a partial review so the user can roll those
+                // back if they want, instead of being stranded.
+                const snapshot = turnSnapshotsRef.current.get(assistantMsg.id);
+                const partial: PendingChange[] = snapshot
+                    ? buildPendingChanges(snapshot, turnActionsRef.current)
+                    : [];
+                if (partial.length === 0) {
+                    turnSnapshotsRef.current.delete(assistantMsg.id);
+                }
                 if ((err as Error)?.name === 'AbortError') {
                     updateAssistantMessage(assistantMsg.id, (m) => ({
                         ...m,
                         isStreaming: false,
                         content: m.content + (m.content ? '\n\n' : '') + '_(stopped)_',
+                        review:
+                            partial.length > 0
+                                ? { pending: partial, total: partial.length }
+                                : m.review,
                     }));
                 } else {
                     const message = (err as Error)?.message || 'Something went wrong.';
@@ -352,10 +544,15 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                         isStreaming: false,
                         errored: true,
                         content: message,
+                        review:
+                            partial.length > 0
+                                ? { pending: partial, total: partial.length }
+                                : m.review,
                     }));
                 }
             } finally {
                 abortRef.current = null;
+                turnActionsRef.current = [];
                 setState((s) => ({ ...s, isStreaming: false }));
             }
 
@@ -400,6 +597,9 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                 }
 
                 if (ev.type === 'action') {
+                    // Record the raw action so we can replay it into a
+                    // PendingChange[] once the turn finishes.
+                    turnActionsRef.current.push(ev.action);
                     setState((s) => {
                         if (!s.workspace) return s;
                         const newFiles = applyAction(s.workspace.files, ev.action);
@@ -503,5 +703,7 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
         sendMessage,
         resumePending,
         abort,
+        acceptChanges,
+        rejectChanges,
     };
 }

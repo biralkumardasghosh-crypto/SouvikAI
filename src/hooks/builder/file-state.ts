@@ -1,6 +1,7 @@
 import type {
     BuilderFiles,
     BuilderFileAction,
+    PendingChange,
 } from '@/types/code';
 
 /**
@@ -65,4 +66,100 @@ export function genId(prefix = 'm'): string {
 export function deriveWorkspaceTitle(message: string): string {
     const words = message.split(/\s+/).slice(0, 6).join(' ');
     return words.length > 50 ? words.slice(0, 50) + '…' : words || 'New build';
+}
+
+/**
+ * Distil a turn's stream of {@link BuilderFileAction}s into a per-path
+ * {@link PendingChange} list, computed against the snapshot taken when
+ * the turn started.
+ *
+ * Multiple actions targeting the same path within a single turn are
+ * collapsed into one net change: e.g. `create foo.ts` + `edit foo.ts`
+ * shows up as a single "Created `foo.ts`" entry with the final content
+ * as `after`. Renames produce two linked entries — a delete at the
+ * original path and a create at the new path — so each side gets its
+ * own diff and can be accepted/rejected independently.
+ *
+ * Paths whose final content equals the snapshot are filtered out (e.g.
+ * the agent edited a file and then reverted to the original); they
+ * don't represent a user-visible change worth reviewing.
+ */
+export function buildPendingChanges(
+    snapshot: BuilderFiles,
+    actions: BuilderFileAction[],
+): PendingChange[] {
+    // Walk actions in order against a working copy and remember the
+    // most-recent rename pairing for each affected path.
+    const working: BuilderFiles = { ...snapshot };
+    // Map "from" -> "to" tracking the latest move for any path. Used
+    // only for UI labels; multi-step renames (a → b → c) collapse
+    // to (a → c).
+    const movedTo = new Map<string, string>();
+    const movedFrom = new Map<string, string>();
+
+    for (const action of actions) {
+        if (action.kind === 'create' || action.kind === 'edit') {
+            working[action.path] = action.content;
+            continue;
+        }
+        if (action.kind === 'delete') {
+            delete working[action.path];
+            continue;
+        }
+        // rename
+        if (action.from === action.to) continue;
+        if (action.from in working) {
+            working[action.to] = working[action.from];
+            delete working[action.from];
+        }
+        // Walk back through any earlier rename so we point at the
+        // original path the user knew, not an intermediate alias.
+        const ultimateFrom = movedFrom.get(action.from) ?? action.from;
+        // Clear the previous edge if we're moving again so we don't
+        // accumulate stale links.
+        const prevTo = movedTo.get(ultimateFrom);
+        if (prevTo && prevTo !== action.to) movedFrom.delete(prevTo);
+        movedTo.set(ultimateFrom, action.to);
+        movedFrom.set(action.to, ultimateFrom);
+    }
+
+    // Compute the union of all paths that appeared on either side.
+    // Build via an object to avoid Set-iteration target requirements.
+    const pathSet: Record<string, true> = {};
+    for (const k of Object.keys(snapshot)) pathSet[k] = true;
+    for (const k of Object.keys(working)) pathSet[k] = true;
+
+    const out: PendingChange[] = [];
+    for (const path of Object.keys(pathSet)) {
+        const before = path in snapshot ? snapshot[path] : null;
+        const after = path in working ? working[path] : null;
+        if (before === after) continue; // No net change.
+
+        let kind: PendingChange['kind'];
+        if (before === null && after !== null) kind = 'create';
+        else if (before !== null && after === null) kind = 'delete';
+        else kind = 'edit';
+
+        const change: PendingChange = { path, kind, before, after };
+        if (kind === 'delete' && movedTo.has(path)) {
+            change.renamedTo = movedTo.get(path);
+        }
+        if (kind === 'create' && movedFrom.has(path)) {
+            change.renamedFrom = movedFrom.get(path);
+        }
+        out.push(change);
+    }
+
+    // Sort: creates first, then edits, then deletes; alphabetical
+    // within each bucket for stable display.
+    const order: Record<PendingChange['kind'], number> = {
+        create: 0,
+        edit: 1,
+        delete: 2,
+    };
+    out.sort((a, b) => {
+        const k = order[a.kind] - order[b.kind];
+        return k !== 0 ? k : a.path.localeCompare(b.path);
+    });
+    return out;
 }

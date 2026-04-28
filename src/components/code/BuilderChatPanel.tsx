@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { AlertCircle, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowRight, GitCompare, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentTimeline } from './AgentTimeline';
 import { BuilderChatInput } from './BuilderChatInput';
@@ -17,6 +17,12 @@ interface BuilderChatPanelProps {
     onModelChange: (id: string) => void;
     onSend: (text: string) => void;
     onStop: () => void;
+    /**
+     * Open the diff review surface in the right pane. Triggered from
+     * the inline "Review N changes" banner under any assistant message
+     * whose turn produced still-unreviewed file changes.
+     */
+    onOpenReview: () => void;
 }
 
 export function BuilderChatPanel({
@@ -28,6 +34,7 @@ export function BuilderChatPanel({
     onModelChange,
     onSend,
     onStop,
+    onOpenReview,
 }: BuilderChatPanelProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +64,12 @@ export function BuilderChatPanel({
                 ) : (
                     <div className="flex flex-col gap-4 max-w-full">
                         {messages.map((msg) => (
-                            <MessageView key={msg.id} message={msg} isStreaming={isStreaming} />
+                            <MessageView
+                                key={msg.id}
+                                message={msg}
+                                isStreaming={isStreaming}
+                                onOpenReview={onOpenReview}
+                            />
                         ))}
                     </div>
                 )}
@@ -89,9 +101,11 @@ export function BuilderChatPanel({
 function MessageView({
     message,
     isStreaming,
+    onOpenReview,
 }: {
     message: BuilderMessage;
     isStreaming: boolean;
+    onOpenReview: () => void;
 }) {
     if (message.role === 'user') {
         return (
@@ -135,6 +149,37 @@ function MessageView({
                     <span className="typing-dot">·</span>
                 </div>
             )}
+            {/*
+              Inline review banner. Only renders once the turn is no
+              longer streaming AND there are still pending changes —
+              accepting or rejecting from the diff panel removes
+              entries from `review.pending`, so the banner naturally
+              disappears when the queue is drained.
+            */}
+            {!isThisStreaming &&
+                message.review &&
+                message.review.pending.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onOpenReview}
+                        className="mt-2.5 inline-flex items-center gap-2 self-start rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-[12px] text-foreground transition-colors hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <GitCompare className="size-3.5 text-foreground-subtle" aria-hidden />
+                        <span className="font-medium">
+                            Review {message.review.pending.length}{' '}
+                            {message.review.pending.length === 1
+                                ? 'change'
+                                : 'changes'}
+                        </span>
+                        {message.review.total > message.review.pending.length && (
+                            <span className="text-foreground-subtle">
+                                ({message.review.total - message.review.pending.length}{' '}
+                                resolved)
+                            </span>
+                        )}
+                        <ArrowRight className="size-3 text-foreground-subtle" aria-hidden />
+                    </button>
+                )}
         </div>
     );
 }
