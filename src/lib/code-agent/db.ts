@@ -255,6 +255,32 @@ export async function applyFileAction(
         return;
     }
 
+    if (action.kind === 'rename') {
+        if (action.from === action.to) return; // no-op
+        // Drop the destination if it already exists (overwrite semantics) and
+        // then move the source row into its place. Done as two statements so
+        // the unique (workspace_id, path) index never trips.
+        const { error: delErr } = await sb
+            .from('builder_files')
+            .delete()
+            .eq('workspace_id', workspaceId)
+            .eq('path', action.to);
+        if (delErr) throw delErr;
+        const { error: updErr } = await sb
+            .from('builder_files')
+            .update({ path: action.to })
+            .eq('workspace_id', workspaceId)
+            .eq('path', action.from);
+        if (updErr) throw updErr;
+        // If the workspace's active file was the source path, follow the move.
+        await sb
+            .from('builder_workspaces')
+            .update({ active_file: action.to })
+            .eq('id', workspaceId)
+            .eq('active_file', action.from);
+        return;
+    }
+
     // Cap the workspace size to avoid runaway models exhausting storage.
     if (action.kind === 'create') {
         const { count, error: cErr } = await supabase
@@ -373,6 +399,27 @@ export async function deleteWorkspaceFile(
         .eq('workspace_id', workspaceId)
         .eq('path', path);
     if (error) throw error;
+}
+
+/**
+ * Cheap fetch of a workspace's `path → content` map. Used by the agent route
+ * between phases of a tool-using turn (after running file actions, the
+ * agent's next prompt needs the freshly applied content).
+ */
+export async function fetchWorkspaceFiles(
+    supabase: DB,
+    workspaceId: string,
+): Promise<BuilderFiles> {
+    const { data, error } = await supabase
+        .from('builder_files')
+        .select('path, content')
+        .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const out: BuilderFiles = {};
+    for (const row of (data ?? []) as Pick<FileRow, 'path' | 'content'>[]) {
+        out[row.path] = row.content;
+    }
+    return out;
 }
 
 export const BUILDER_DB_LIMITS = {

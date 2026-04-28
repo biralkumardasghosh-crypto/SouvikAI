@@ -62,6 +62,17 @@ function applyAction(files: BuilderFiles, action: BuilderFileAction): BuilderFil
         delete next[action.path];
         return next;
     }
+    if (action.kind === 'rename') {
+        if (action.from === action.to) return files;
+        if (!(action.from in files)) {
+            // Source missing — nothing to move. The server will no-op too.
+            return files;
+        }
+        const next = { ...files };
+        next[action.to] = next[action.from];
+        delete next[action.from];
+        return next;
+    }
     return { ...files, [action.path]: action.content };
 }
 
@@ -450,6 +461,13 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                             const keys = Object.keys(newFiles);
                             activeFile = keys[0] ?? null;
                         } else if (
+                            ev.action.kind === 'rename' &&
+                            activeFile === ev.action.from
+                        ) {
+                            // Follow the move so the editor stays focused on
+                            // the same logical file.
+                            activeFile = ev.action.to;
+                        } else if (
                             (ev.action.kind === 'create' || ev.action.kind === 'edit') &&
                             !activeFile
                         ) {
@@ -470,6 +488,35 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
                                         id: genId('s'),
                                         kind: 'action',
                                         action: ev.action,
+                                        status: 'done',
+                                    };
+                                    return { ...m, steps: [...prevSteps, next] };
+                                }),
+                            },
+                        };
+                    });
+                    return;
+                }
+
+                if (ev.type === 'read') {
+                    // Show the agent's read-tool call in the timeline. The
+                    // server fetches the file content and feeds it back into
+                    // the next phase; the client just records that it
+                    // happened.
+                    setState((s) => {
+                        if (!s.workspace) return s;
+                        return {
+                            ...s,
+                            workspace: {
+                                ...s.workspace,
+                                updatedAt: Date.now(),
+                                messages: s.workspace.messages.map((m) => {
+                                    if (m.id !== msgId) return m;
+                                    const prevSteps = m.steps ?? [];
+                                    const next: BuilderStep = {
+                                        id: genId('s'),
+                                        kind: 'read',
+                                        path: ev.path,
                                         status: 'done',
                                     };
                                     return { ...m, steps: [...prevSteps, next] };

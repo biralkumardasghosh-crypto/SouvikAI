@@ -9,6 +9,8 @@ import type { BuilderFileAction, BuilderStreamEvent } from '@/types/code';
  *   • <action type="create" path="...">...</action>
  *   • <action type="edit"   path="...">...</action>
  *   • <action type="delete" path="..." />
+ *   • <action type="rename" from="..." to="..." />
+ *   • <read path="..." />            — agent tool call: fetch full file contents
  *
  * Anything outside a tag is emitted as `{ type: 'text', delta: ... }`. A `<`
  * that *might* be the start of a tag is held back until we have enough buffer
@@ -87,6 +89,7 @@ export class BuilderTagStreamParser {
             /<milestone[\s>/]/gi,
             /<\/milestone>/gi,
             /<action[\s>/]/gi,
+            /<read[\s>/]/gi,
         ];
         for (const re of candidates) {
             re.lastIndex = 0;
@@ -158,6 +161,35 @@ export class BuilderTagStreamParser {
             return null;
         }
 
+        // ── read: self-closing tool call ─────────────────────────────────────
+        // Form: <read path="..." />  (the open+close form is also accepted in
+        // case the model emits it, but the body is ignored — it's a tool call,
+        // not a content tag.)
+        const readSelfClose = /^<read([^>]*?)\/\s*>/i.exec(rest);
+        if (readSelfClose) {
+            const attrs = parseAttrs(readSelfClose[1]);
+            const path = sanitizePath(attrs.path || '');
+            return {
+                event: path ? { type: 'read', path } : null,
+                consumed: idx + readSelfClose[0].length,
+            };
+        }
+        const readFullClose = /^<read([^>]*)>([\s\S]*?)<\/read>/i.exec(rest);
+        if (readFullClose) {
+            const attrs = parseAttrs(readFullClose[1]);
+            const path = sanitizePath(attrs.path || '');
+            return {
+                event: path ? { type: 'read', path } : null,
+                consumed: idx + readFullClose[0].length,
+            };
+        }
+        if (/^<read[\s>]/i.test(rest)) {
+            if (final) {
+                return { event: null, consumed: idx + rest.length };
+            }
+            return null;
+        }
+
         // No recognised pattern at idx — emit the `<` as text and advance one char.
         return { event: { type: 'text', delta: '<' }, consumed: idx + 1 };
     }
@@ -189,6 +221,15 @@ function buildActionFromAttrs(
     body: string,
 ): BuilderFileAction | null {
     const type = (attrs.type || '').toLowerCase();
+
+    // Rename uses `from` + `to` instead of `path` and never carries a body.
+    if (type === 'rename') {
+        const from = sanitizePath(attrs.from || '');
+        const to = sanitizePath(attrs.to || '');
+        if (!from || !to || from === to) return null;
+        return { kind: 'rename', from, to };
+    }
+
     const path = sanitizePath(attrs.path || '');
     if (!path) return null;
 

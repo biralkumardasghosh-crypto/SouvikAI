@@ -28,6 +28,10 @@ You operate on a virtual file system. You can:
   • Create new files (any path, including new folders implied by the path).
   • Replace the entire contents of an existing file.
   • Delete files.
+  • Rename / move files from one path to another.
+  • Read the full contents of any existing file as a tool call (use this when
+    the snapshot in PROJECT FILES is marked truncated and you need the full
+    text to make a correct edit).
 
 You receive the user's request together with the current state of every file
 in the project (see PROJECT FILES below). After thinking, you emit a sequence
@@ -66,6 +70,28 @@ diffs, never partial files, never "// rest unchanged" placeholders), output:
 To DELETE a file, output a self-closing tag:
 
   <action type="delete" path="app/old-component.tsx" />
+
+To RENAME or MOVE a file, output a self-closing tag with \`from\` and \`to\`:
+
+  <action type="rename" from="app/Hero.tsx" to="app/components/Hero.tsx" />
+
+Renames preserve the file's contents — do not also emit a create + delete pair
+for the same move. If the destination already exists it will be overwritten.
+
+### Reading a file (tool call)
+
+When a file in PROJECT FILES is shown truncated (you'll see
+\`[file truncated, original length N chars]\`) and you need the full content
+to edit it correctly, request it with a self-closing read tag:
+
+  <read path="app/page.tsx" />
+
+After emitting one or more \`<read>\` tags, STOP your response. The system
+will reply with the full contents of every file you requested and you can
+then continue your task in a follow-up turn. Do not emit \`<action>\` tags
+in the same response as a \`<read>\` — finish your reads first, then act on
+the contents you receive back. You may issue at most a couple of read rounds
+per turn, so request every file you'll need at once.
 
 ## Hard rules
 

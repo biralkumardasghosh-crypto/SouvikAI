@@ -5,8 +5,10 @@ import {
     CheckCircle2,
     ChevronDown,
     Clock,
-    FilePlus2,
+    Eye,
     FileEdit,
+    FilePlus2,
+    FileSymlink,
     FileX2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,9 +43,11 @@ export function AgentTimeline({ steps, isStreaming }: AgentTimelineProps) {
     } else if (hasSteps) {
         const milestoneCount = steps.filter((s) => s.kind === 'milestone').length;
         const actionCount = steps.filter((s) => s.kind === 'action').length;
+        const readCount = steps.filter((s) => s.kind === 'read').length;
         const parts: string[] = [];
         if (milestoneCount) parts.push(`${milestoneCount} step${milestoneCount === 1 ? '' : 's'}`);
         if (actionCount) parts.push(`${actionCount} change${actionCount === 1 ? '' : 's'}`);
+        if (readCount) parts.push(`${readCount} read${readCount === 1 ? '' : 's'}`);
         header = parts.join(' · ') || 'Done';
     } else {
         header = 'Working…';
@@ -152,8 +156,45 @@ function renderStep(step: BuilderStep, isStreaming: boolean): React.ReactNode {
         );
     }
 
-    // Action step
+    if (step.kind === 'read') {
+        return (
+            <div className="flex items-start gap-2.5">
+                <span className="relative z-10 flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-background mt-0.5 text-violet-500/85">
+                    <Eye className="h-3.5 w-3.5" />
+                </span>
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <span className="text-sm text-foreground/85 leading-relaxed">Read</span>
+                    <code className="text-[12px] font-mono px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle text-foreground-muted truncate">
+                        {step.path}
+                    </code>
+                </div>
+            </div>
+        );
+    }
+
+    // Action step (create / edit / delete / rename)
     const { action } = step;
+
+    if (action.kind === 'rename') {
+        return (
+            <div className="flex items-start gap-2.5">
+                <span className="relative z-10 flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-background mt-0.5 text-amber-500/85">
+                    <FileSymlink className="h-3.5 w-3.5" />
+                </span>
+                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-sm text-foreground/85 leading-relaxed">Renamed</span>
+                    <code className="text-[12px] font-mono px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle text-foreground-muted truncate">
+                        {action.from}
+                    </code>
+                    <span className="text-foreground-muted/70 text-xs">→</span>
+                    <code className="text-[12px] font-mono px-1.5 py-0.5 rounded bg-surface-2 border border-border-subtle text-foreground-muted truncate">
+                        {action.to}
+                    </code>
+                </div>
+            </div>
+        );
+    }
+
     const { Icon, label, color } = describeAction(action.kind);
 
     return (

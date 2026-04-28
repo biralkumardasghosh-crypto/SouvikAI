@@ -6,6 +6,7 @@ import { buildBuilderSystemPrompt } from '@/lib/code-agent/system-prompt';
 import { BuilderTagStreamParser } from '@/lib/code-agent/parser';
 import {
     applyFileAction,
+    fetchWorkspaceFiles,
     insertBuilderMessage,
     loadWorkspaceForUser,
 } from '@/lib/code-agent/db';
@@ -26,6 +27,15 @@ const NVIDIA_TIMEOUT_MS = 45_000; // generous — agent turns produce more token
 const MAX_INPUT_CHARS = 40_000;
 const MAX_HISTORY_TURNS = 12;
 const MAX_HISTORY_CHARS_PER_TURN = 4_000;
+/**
+ * One "turn" from the user's perspective may be split into several phases
+ * when the agent uses the read-file tool: phase 1 streams until the agent
+ * emits `<read>` tags, then we feed the requested files back and run another
+ * phase. Capped to keep cost & latency bounded.
+ */
+const MAX_AGENT_PHASES = 3;
+/** Per file cap for content injected back into a read-result tool message. */
+const MAX_READ_RESULT_CHARS_PER_FILE = 32_000;
 
 interface AgentRequestBody {
     /** Workspace this turn belongs to. Server is the source of truth. */
@@ -249,35 +259,9 @@ export async function POST(request: NextRequest) {
             dbModel.name || adminSettings?.model_name || 'meta/llama-3.1-8b-instruct';
 
         // ── Stream from NVIDIA, parse tags into NDJSON events ────────────────
-        const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), NVIDIA_TIMEOUT_MS);
-
-        let upstream: ReadableStream<Uint8Array>;
-        try {
-            upstream = await streamNvidiaCompletion(apiMessages, {
-                model: modelName,
-                temperature,
-                maxTokens,
-                signal: timeoutController.signal,
-            });
-        } catch (err) {
-            clearTimeout(timeoutId);
-            const isTimeout = (err as Error)?.name === 'AbortError';
-            console.error('[Builder Agent] upstream error:', err);
-            return NextResponse.json(
-                {
-                    error: isTimeout
-                        ? 'The model took too long to respond. Please try again.'
-                        : `Model error: ${(err as Error).message}`,
-                },
-                { status: isTimeout ? 504 : 502 },
-            );
-        }
-
-        const textStream = parseSSEStream(upstream);
-        const reader = textStream.getReader();
-        const parser = new BuilderTagStreamParser();
-        const stripThink = createThinkStripper();
+        // A turn is split into 1–MAX_AGENT_PHASES phases. Each phase calls
+        // the model once. If the model emits `<read>` tags, we run another
+        // phase with the requested file contents fed back as a tool result.
 
         // Server-side mirror of the conversation that gets persisted at end.
         const stepsAcc: BuilderStep[] = [];
@@ -304,6 +288,13 @@ export async function POST(request: NextRequest) {
             }
         };
 
+        // Tracks state shared between the phase loop and the per-phase event
+        // handler. `requestedReads` is reset at the start of each phase.
+        const phaseState = {
+            phaseText: '',
+            requestedReads: [] as string[],
+        };
+
         // Mirror the parsed event into our server-side accumulators. We do
         // this in addition to forwarding the raw event downstream so we can
         // persist the final assistant turn (timeline + content) once the
@@ -311,6 +302,7 @@ export async function POST(request: NextRequest) {
         // the order they're emitted.
         const handleServerEvent = (ev: BuilderStreamEvent) => {
             if (ev.type === 'text') {
+                phaseState.phaseText += ev.delta;
                 textAcc += ev.delta;
                 return;
             }
@@ -334,29 +326,129 @@ export async function POST(request: NextRequest) {
                 queueWrite(() => persistAction(supabase, workspaceId, ev.action));
                 return;
             }
+            if (ev.type === 'read') {
+                stepsAcc.push({
+                    id: genStepId(),
+                    kind: 'read',
+                    path: ev.path,
+                    status: 'done',
+                });
+                phaseState.requestedReads.push(ev.path);
+                return;
+            }
         };
+
+        // The currently-active upstream reader. Tracked so `cancel()` can tear
+        // down whichever phase is in flight when the client disconnects.
+        let activeReader: ReadableStreamDefaultReader<string> | null = null;
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => timeoutController.abort(), NVIDIA_TIMEOUT_MS);
 
         const out = new ReadableStream<Uint8Array>({
             async start(controller) {
                 let errored = false;
+                let phaseMessages = apiMessages;
+
                 try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+                    for (let phase = 1; phase <= MAX_AGENT_PHASES; phase++) {
+                        phaseState.phaseText = '';
+                        phaseState.requestedReads = [];
 
-                        outputChars += value.length;
-                        const cleaned = stripThink(value);
-
-                        for (const ev of parser.feed(cleaned)) {
-                            handleServerEvent(ev);
-                            controller.enqueue(encodeEvent(ev));
+                        let upstream: ReadableStream<Uint8Array>;
+                        try {
+                            upstream = await streamNvidiaCompletion(phaseMessages, {
+                                model: modelName,
+                                temperature,
+                                maxTokens,
+                                signal: timeoutController.signal,
+                            });
+                        } catch (err) {
+                            const isTimeout = (err as Error)?.name === 'AbortError';
+                            console.error('[Builder Agent] upstream error:', err);
+                            controller.enqueue(
+                                encodeEvent({
+                                    type: 'error',
+                                    message: isTimeout
+                                        ? 'The model took too long to respond. Please try again.'
+                                        : `Model error: ${(err as Error).message}`,
+                                }),
+                            );
+                            errored = true;
+                            break;
                         }
+
+                        const reader = parseSSEStream(upstream).getReader();
+                        activeReader = reader;
+                        const parser = new BuilderTagStreamParser();
+                        const stripThink = createThinkStripper();
+
+                        try {
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+
+                                outputChars += value.length;
+                                const cleaned = stripThink(value);
+
+                                for (const ev of parser.feed(cleaned)) {
+                                    handleServerEvent(ev);
+                                    controller.enqueue(encodeEvent(ev));
+                                }
+                            }
+                            for (const ev of parser.flush()) {
+                                handleServerEvent(ev);
+                                controller.enqueue(encodeEvent(ev));
+                            }
+                        } finally {
+                            activeReader = null;
+                        }
+
+                        if (phaseState.requestedReads.length === 0) {
+                            // Phase finished without asking for more files —
+                            // we're done.
+                            break;
+                        }
+
+                        if (phase >= MAX_AGENT_PHASES) {
+                            // Hit the cap — stop here and record a soft warning.
+                            controller.enqueue(
+                                encodeEvent({
+                                    type: 'error',
+                                    message:
+                                        'Reached the read-tool limit for this turn. Send a follow-up to continue.',
+                                }),
+                            );
+                            break;
+                        }
+
+                        // Wait for any in-flight file writes from this phase
+                        // before fetching fresh content for the next one.
+                        try {
+                            await writeChain;
+                        } catch {
+                            /* logged inside queueWrite */
+                        }
+
+                        // Fulfil the read tool call and prepare the next phase.
+                        const freshFiles = await fetchWorkspaceFiles(supabase, workspaceId);
+                        const toolMessage = renderReadToolResult(
+                            phaseState.requestedReads,
+                            freshFiles,
+                        );
+
+                        // Rebuild the system prompt with the freshest file
+                        // listing — the model needs to see edits it just made.
+                        phaseMessages = [
+                            { role: 'system' as const, content: buildBuilderSystemPrompt(freshFiles) },
+                            ...phaseMessages.slice(1),
+                            // The assistant's response from the just-finished
+                            // phase, including the `<read>` tags. Including it
+                            // verbatim lets the model continue its own thread.
+                            { role: 'assistant' as const, content: phaseState.phaseText },
+                            { role: 'user' as const, content: toolMessage },
+                        ];
                     }
 
-                    for (const ev of parser.flush()) {
-                        handleServerEvent(ev);
-                        controller.enqueue(encodeEvent(ev));
-                    }
                     closeOpenMilestone();
                     controller.enqueue(encodeEvent({ type: 'done' }));
                 } catch (err) {
@@ -413,7 +505,7 @@ export async function POST(request: NextRequest) {
             },
             cancel() {
                 try {
-                    reader.cancel();
+                    activeReader?.cancel();
                 } catch {
                     /* ignore */
                 }
@@ -454,7 +546,8 @@ async function persistAction(
     try {
         await applyFileAction(supabase, workspaceId, action);
     } catch (err) {
-        console.error('[Builder Agent] persist action failed:', action.kind, action.path, err);
+        const target = action.kind === 'rename' ? `${action.from} -> ${action.to}` : action.path;
+        console.error('[Builder Agent] persist action failed:', action.kind, target, err);
     }
 }
 
@@ -475,14 +568,60 @@ function renderHistoryContent(
     }
     const parts: string[] = [];
     for (const s of steps) {
-        if (s.kind === 'milestone') parts.push(`• ${s.text}`);
-        else parts.push(`[${s.action.kind}] ${s.action.path}`);
+        if (s.kind === 'milestone') {
+            parts.push(`• ${s.text}`);
+        } else if (s.kind === 'read') {
+            parts.push(`[read] ${s.path}`);
+        } else if (s.action.kind === 'rename') {
+            parts.push(`[rename] ${s.action.from} → ${s.action.to}`);
+        } else {
+            parts.push(`[${s.action.kind}] ${s.action.path}`);
+        }
     }
     if (content.trim()) parts.push(content.trim());
     const joined = parts.join('\n');
     return joined.length > MAX_HISTORY_CHARS_PER_TURN
         ? joined.slice(0, MAX_HISTORY_CHARS_PER_TURN) + ' [truncated]'
         : joined;
+}
+
+/**
+ * Render the synthetic user message that fulfils a batch of `<read>` tool
+ * calls. Each requested file is included in full (subject to a generous
+ * per-file cap), or marked NOT FOUND if it doesn't exist in the workspace.
+ *
+ * Duplicate paths in the request are deduped — the model sometimes asks for
+ * the same file twice if it's iterating.
+ */
+function renderReadToolResult(
+    paths: string[],
+    files: Record<string, string>,
+): string {
+    const seen = new Set<string>();
+    const blocks: string[] = [];
+    for (const p of paths) {
+        if (seen.has(p)) continue;
+        seen.add(p);
+        const raw = files[p];
+        if (raw === undefined) {
+            blocks.push(`--- FILE NOT FOUND: ${p} ---`);
+            continue;
+        }
+        let content = raw;
+        let suffix = '';
+        if (content.length > MAX_READ_RESULT_CHARS_PER_FILE) {
+            content = content.slice(0, MAX_READ_RESULT_CHARS_PER_FILE);
+            suffix = `\n... [further content truncated; original length ${raw.length} chars]`;
+        }
+        blocks.push(`--- FILE: ${p} ---\n${content}${suffix}\n--- END FILE ---`);
+    }
+    return [
+        '<read-result>',
+        blocks.join('\n\n'),
+        '</read-result>',
+        '',
+        'Above are the full contents you requested. Continue your previous task using these contents — emit milestones, file actions, and a final summary as usual. Do not emit `<read>` again unless you genuinely need another file.',
+    ].join('\n');
 }
 
 /**

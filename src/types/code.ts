@@ -15,15 +15,20 @@ export type BuilderFiles = Record<string, string>;
 export type BuilderFileAction =
     | { kind: 'create'; path: string; content: string }
     | { kind: 'edit'; path: string; content: string }
-    | { kind: 'delete'; path: string };
+    | { kind: 'delete'; path: string }
+    | { kind: 'rename'; from: string; to: string };
 
 /**
  * A "step" rendered in the agent's vertical timeline. A step is either a
- * milestone label or a record of a file action that was just applied.
+ * milestone label, a record of a file action that was just applied, or a
+ * record of a tool call (currently only `read` — the agent fetched the full
+ * contents of an existing file because the snapshot in the system prompt was
+ * truncated).
  */
 export type BuilderStep =
     | { id: string; kind: 'milestone'; text: string; status: 'doing' | 'done' }
-    | { id: string; kind: 'action'; action: BuilderFileAction; status: 'done' };
+    | { id: string; kind: 'action'; action: BuilderFileAction; status: 'done' }
+    | { id: string; kind: 'read'; path: string; status: 'done' };
 
 /** A single message in the builder conversation. */
 export interface BuilderMessage {
@@ -44,6 +49,7 @@ export interface BuilderMessage {
 export type BuilderStreamEvent =
     | { type: 'milestone'; text: string }
     | { type: 'action'; action: BuilderFileAction }
+    | { type: 'read'; path: string }
     | { type: 'text'; delta: string }
     | { type: 'error'; message: string }
     | { type: 'done' };
