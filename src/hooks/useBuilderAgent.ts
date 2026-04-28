@@ -122,12 +122,16 @@ export function useBuilderAgent(workspaceId: string): UseBuilderAgentResult {
         };
     }, [workspaceId]);
 
-    // Cleanup pending timers on unmount.
+    // Cleanup pending timers on unmount. Capture the ref values into the
+    // effect closure so the cleanup uses the same Map/timer that was live
+    // when the effect mounted (silences exhaustive-deps in strict mode).
     useEffect(() => {
+        const saveTimers = saveTimersRef.current;
+        const activeFileTimer = activeFileTimerRef.current;
         return () => {
-            saveTimersRef.current.forEach((t) => clearTimeout(t));
-            saveTimersRef.current.clear();
-            if (activeFileTimerRef.current) clearTimeout(activeFileTimerRef.current);
+            saveTimers.forEach((t) => clearTimeout(t));
+            saveTimers.clear();
+            if (activeFileTimer) clearTimeout(activeFileTimer);
         };
     }, []);
 

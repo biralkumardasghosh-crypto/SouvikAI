@@ -1,119 +1,101 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { streamNvidiaCompletion, parseSSEStream } from '@/lib/nvidia-nim';
 import { Database } from '@/types/database';
 import type { AttachmentPayload } from '@/types/attachments';
-import { formatSearchContext } from '@/lib/web-search';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+
+import { rejectCrossOrigin } from '@/lib/api/origin-guard';
+import {
+    checkRateAndQuota,
+    estimateTokens,
+    logRequest,
+    recordTokenUsage,
+} from '@/lib/api/quota';
+import { surfaceServerError } from '@/lib/api/error-response';
+import { getChatSystemPrompt } from '@/lib/system-prompt-loader';
+import {
+    CHAT_NVIDIA_TIMEOUT_MS,
+    DEFAULT_QUOTA_LIMIT,
+    MAX_CHAT_HISTORY_TURNS,
+    MAX_INPUT_CHARS,
+} from '@/lib/limits';
+import {
+    buildHistory,
+    buildUserContent,
+    composeApiMessages,
+} from '@/lib/chat/messages';
+import { applyWebSearchTool } from '@/lib/chat/prompt-tools';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type AdminSettingsRow = Database['public']['Tables']['admin_settings']['Row'];
 
-// ── Quota configuration ──────────────────────────────────────────────────────
-const QUOTA_WINDOW_MS = 5 * 60 * 60 * 1000; // 5 hours
-const RPM_LIMIT = 20;
-
-/** Must match the client-side cap in useChat.ts. */
-const MAX_INPUT_CHARS = 40_000;
-
-/** NVIDIA API timeout — fail fast so the client gets a real error, not a hung stream. */
-const NVIDIA_TIMEOUT_MS = 25_000;
-
-// ── System prompt — loaded async per-request with a simple in-process cache ──
-// We avoid module-level synchronous fs.readFileSync which can crash serverless
-// runtimes (e.g. Vercel) where process.cwd() resolves unexpectedly at cold-start.
-let _systemPromptCache: string | null = null;
-
-async function getSystemPrompt(): Promise<string> {
-    // In development, never cache — always read fresh so edits to
-    // system_prompt.txt take effect without restarting the server.
-    if (process.env.NODE_ENV === 'development') {
-        _systemPromptCache = null;
-    }
-
-    if (_systemPromptCache !== null) return _systemPromptCache;
-    try {
-        _systemPromptCache = await fs.readFile(
-            path.join(process.cwd(), 'system_prompt.txt'),
-            'utf-8'
-        );
-    } catch {
-        console.warn('[Chat] Could not read system_prompt.txt, using default');
-        _systemPromptCache = 'You are SouvikAI, a helpful and concise AI assistant.';
-    }
-    return _systemPromptCache;
-}
-
-// Rough token estimate: ~4 chars per token
-function estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
-}
-
+/**
+ * POST /api/chat
+ *
+ * Streams a chat completion from NVIDIA NIM, gated by:
+ *   - same-origin CSRF check
+ *   - server-side input length cap (mirrors useChat.ts)
+ *   - admin edit-mode kill switch
+ *   - per-model availability + suspension
+ *   - per-user account state (deleted / kicked / suspended)
+ *   - rate limit (RPM) and per-model token quota (5h window)
+ *
+ * The orchestration is the route's only job — every concern above lives
+ * in a helper under `lib/api/*`, `lib/chat/*`, or `lib/limits.ts`.
+ */
 export async function POST(request: NextRequest) {
     try {
-        // ── CSRF: reject requests that explicitly come from a different origin ──
-        // We only enforce when Origin is present and parseable. Same-origin
-        // browser fetches set Origin=<host>; server-to-server and some mobile
-        // clients omit it entirely — those are allowed through.
-        const origin = request.headers.get('origin');
-        const host   = request.headers.get('host');
-        if (origin && host) {
-            try {
-                const originHost = new URL(origin).host;
-                // Strip port for comparison when both sides use standard ports
-                const normalise = (h: string) => h.replace(/:(?:80|443)$/, '');
-                if (normalise(originHost) !== normalise(host)) {
-                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-                }
-            } catch {
-                // Malformed Origin — deny to be safe
-                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-            }
-        }
+        // ── CSRF guard ──────────────────────────────────────────────────────
+        const forbidden = rejectCrossOrigin(request);
+        if (forbidden) return forbidden;
 
         const supabase = await createClient();
 
-        // ── Parse request body first so we can use modelId / sessionId
-        //    in all subsequent parallel queries without waiting for auth. ────────
-        const { sessionId, messageId, content, model, systemPrompt: userSystemPrompt, attachments = [], tool, searchResults, searchResultsQuery } = await request.json();
+        // ── Body parsing ────────────────────────────────────────────────────
+        const {
+            sessionId,
+            messageId,
+            content,
+            model,
+            systemPrompt: userSystemPrompt,
+            attachments = [],
+            tool,
+            searchResults,
+            searchResultsQuery,
+        } = await request.json();
+
         const typedAttachments: AttachmentPayload[] = Array.isArray(attachments) ? attachments : [];
 
         if (!content) {
             return NextResponse.json({ error: 'Message content is required' }, { status: 400 });
         }
-
-        // ── Server-side input length guard (mirrors client check in useChat.ts) ─
         if (typeof content !== 'string' || content.length > MAX_INPUT_CHARS) {
             return NextResponse.json(
-                { error: `Message exceeds the maximum allowed length of ${MAX_INPUT_CHARS.toLocaleString()} characters.` },
-                { status: 400 }
+                {
+                    error: `Message exceeds the maximum allowed length of ${MAX_INPUT_CHARS.toLocaleString()} characters.`,
+                },
+                { status: 400 },
             );
         }
 
-        // modelId comes from the request body (model.id passed from useChat)
         const modelId: string = model || 'souvik-ai-1';
-        const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
-        const windowStart = new Date(Date.now() - QUOTA_WINDOW_MS).toISOString();
 
-        // ── Batch 1: auth + all queries that don't need user.id ──────────────────
-        // auth.getUser(), admin_settings, models, and chat_messages all run
-        // concurrently. Previously auth ran alone, then Round 1 ran, then Round 2
-        // — that was 3 sequential round-trips. Now it's 2.
+        // ── Batch 1: auth + queries that don't need user.id ─────────────────
+        // Auth, admin settings, model row, and chat history all run in
+        // parallel. Without this the route does 3 sequential round-trips.
         const [authRes, settingsRes, modelRes, chatHistoryRes] = await Promise.all([
             supabase.auth.getUser(),
             supabase.from('admin_settings').select('*').single(),
             supabase.from('models').select('*').eq('id', modelId).single(),
-            // chat_messages only needs sessionId + messageId (both from body).
-            // LIMIT to the last 20 messages — sending unlimited history adds
-            // latency proportional to conversation length. 20 turns covers the
-            // vast majority of context a model actually uses effectively.
-            (sessionId && messageId)
-                ? supabase.from('chat_messages').select('role, content')
-                    .eq('session_id', sessionId)
-                    .neq('id', messageId)
-                    .order('created_at', { ascending: false })
-                    .limit(20)
+            sessionId && messageId
+                ? supabase
+                      .from('chat_messages')
+                      .select('role, content')
+                      .eq('session_id', sessionId)
+                      .neq('id', messageId)
+                      .order('created_at', { ascending: false })
+                      .limit(MAX_CHAT_HISTORY_TURNS)
                 : Promise.resolve({ data: null }),
         ]);
 
@@ -122,16 +104,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // ── Model / admin-settings validation (no DB round-trip needed) ──────────
         const adminSettings = settingsRes.data as AdminSettingsRow | null;
         if (adminSettings?.edit_mode) {
             return NextResponse.json(
                 { error: 'We are currently updating our services, try again later.' },
-                { status: 503 }
+                { status: 503 },
             );
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dbModel: any = modelRes.data;
         if (!dbModel) {
             return NextResponse.json({ error: 'Model not found' }, { status: 404 });
@@ -139,171 +119,64 @@ export async function POST(request: NextRequest) {
         if (dbModel.is_suspended) {
             return NextResponse.json(
                 { error: "This model is currently suspended. We're working on it." },
-                { status: 503 }
+                { status: 503 },
             );
         }
 
-        const quotaLimit: number = dbModel.quota_limit ?? 500_000;
+        const quotaLimit: number = dbModel.quota_limit ?? DEFAULT_QUOTA_LIMIT;
 
-        // ── Batch 2: user-dependent queries (profile, RPM, quota) ────────────────
-        // These need user.id which is now available from Batch 1.
-        const [profileRes, recentRequestsRes, usageRowsRes] = await Promise.all([
+        // ── Batch 2: profile + rate limit + quota check ─────────────────────
+        const [profileRes, gateRes] = await Promise.all([
             supabase.from('profiles').select('*').eq('id', user.id).single(),
-            supabase.from('requests_log')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', user.id)
-                .gte('created_at', oneMinuteAgo),
-            supabase.from('token_usage')
-                .select('tokens_used')
-                .eq('user_id', user.id)
-                .eq('model_id', modelId)
-                .gte('created_at', windowStart),
+            checkRateAndQuota(supabase, user.id, modelId, quotaLimit),
         ]);
 
-        // ── Profile validation ───────────────────────────────────────────────────
+        // Profile validation
         const userProfile = profileRes.data as unknown as ProfileRow;
         if (!userProfile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        if (userProfile.is_deleted) return NextResponse.json({ error: 'Account has been deleted' }, { status: 403 });
-        if (userProfile.is_kicked) return NextResponse.json({ error: 'You have been kicked out of the model quota.' }, { status: 403 });
+        if (userProfile.is_deleted)
+            return NextResponse.json({ error: 'Account has been deleted' }, { status: 403 });
+        if (userProfile.is_kicked)
+            return NextResponse.json(
+                { error: 'You have been kicked out of the model quota.' },
+                { status: 403 },
+            );
         if (userProfile.suspended_until && new Date(userProfile.suspended_until) > new Date()) {
             return NextResponse.json(
-                { error: 'Your account is suspended', until: userProfile.suspended_until, reason: userProfile.suspension_reason },
-                { status: 403 }
+                {
+                    error: 'Your account is suspended',
+                    until: userProfile.suspended_until,
+                    reason: userProfile.suspension_reason,
+                },
+                { status: 403 },
             );
         }
 
-        // ── Rate limit check ─────────────────────────────────────────────────────
-        if ((recentRequestsRes.count ?? 0) >= RPM_LIMIT) {
-            return NextResponse.json(
-                { error: 'Rate limit exceeded. You can send up to 20 messages per minute.' },
-                { status: 429 }
-            );
-        }
+        if (gateRes.response) return gateRes.response;
+        const tokensUsed = gateRes.tokensUsed;
 
-        // ── Quota check ──────────────────────────────────────────────────────────
-        const tokensUsed = (usageRowsRes.data ?? []).reduce(
-            (sum: number, r: { tokens_used: number }) => sum + r.tokens_used,
-            0
-        );
-        if (tokensUsed >= quotaLimit) {
-            return NextResponse.json(
-                { error: 'Token quota exceeded for this model. Please wait for the 5-hour window to reset.', quotaExceeded: true, used: tokensUsed, limit: quotaLimit },
-                { status: 429, headers: { 'X-Quota-Used': String(tokensUsed), 'X-Quota-Limit': String(quotaLimit) } }
-            );
-        }
+        // ── Log request (fire-and-forget) ───────────────────────────────────
+        logRequest(supabase, user.id, modelId);
 
-        // ── Log request (fire-and-forget) ────────────────────────────────────────
-        supabase.from('requests_log').insert({
-            user_id: user.id,
-            model_id: modelId,
-            status: 'completed',
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any).then(({ error }: any) => {
-            if (error) console.error('Failed to log request:', error);
-        });
+        // ── Build the prompt payload ────────────────────────────────────────
+        const history = buildHistory(chatHistoryRes.data as { role: string; content: string | null }[] | null);
+        const userContent = buildUserContent(content, typedAttachments);
 
-        // ── Build conversation history ────────────────────────────────────────────
-        // Messages come back newest-first (DESC) so we reverse to restore
-        // chronological order. Each message is trimmed to 4,000 chars to avoid
-        // a single huge attachment/paste blowing up the context window.
-        const MAX_HISTORY_CHARS = 4_000;
-        let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
-        if (chatHistoryRes.data) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            conversationHistory = (chatHistoryRes.data as any[])
-                .reverse()                          // restore chronological order
-                .map((m) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: typeof m.content === 'string' && m.content.length > MAX_HISTORY_CHARS
-                        ? m.content.slice(0, MAX_HISTORY_CHARS) + ' [truncated]'
-                        : m.content,
-                }));
-        }
-
-        // ── Build system prompt (cached async read — zero cost on warm instances) ─
-        let systemPrompt = await getSystemPrompt();
-        if (userSystemPrompt && userSystemPrompt.trim().length > 0) {
+        let systemPrompt = await getChatSystemPrompt();
+        if (userSystemPrompt && typeof userSystemPrompt === 'string' && userSystemPrompt.trim().length > 0) {
             systemPrompt += `\n\nUser Custom Instructions:\n${userSystemPrompt}`;
         }
 
-        // ── Build user content — vision array if images present, plain string otherwise
-        // Option A: images sent as base64 image_url entries (NVIDIA NIM OpenAI-compat)
-        // Option B: extracted document text prepended to the text content
-        const docContext = typedAttachments
-            .filter((a) => a.kind === 'document' && a.extractedText)
-            .map((a) => `=== Attached document: ${a.name} ===\n${a.extractedText}\n===`)
-            .join('\n\n');
+        const apiMessages = composeApiMessages(systemPrompt, history, userContent);
+        applyWebSearchTool(apiMessages, { tool, searchResults, searchResultsQuery });
 
-        const userText = docContext ? `${docContext}\n\nUser message:\n${content}` : content;
-
-        const imageAttachments = typedAttachments.filter((a) => a.kind === 'image' && a.base64);
-
-        // Build the content field: array (vision) or string (text-only)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const userContent: any = imageAttachments.length > 0
-            ? [
-                { type: 'text', text: userText },
-                ...imageAttachments.map((a) => ({
-                    type: 'image_url',
-                    image_url: { url: a.base64 },
-                })),
-              ]
-            : userText;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const apiMessages: any[] = [
-            { role: 'system' as const, content: systemPrompt },
-            ...conversationHistory,
-            { role: 'user' as const, content: userContent },
-        ];
-
-        // ── Web search tool instructions & context injection ────────
-        if (tool === 'searchWeb' && (!searchResults || searchResults.length === 0)) {
-            // First pass: tell the model how to invoke the search tool. The
-            // example below is illustrative — the model MUST replace the
-            // example keywords with keywords derived from the user's request.
-            apiMessages[0].content += [
-                '',
-                '',
-                '[TOOL AVAILABLE: searchWeb]',
-                "You can search the web for real-time or up-to-date information. To do so, output ONE line containing ONLY a <search> tag whose contents are concise search keywords derived from the user's request. Do NOT include any other text, explanation, or <think> block — just the tag.",
-                '',
-                'Format:  <search>KEYWORDS</search>',
-                'Example: if the user asks "what is the latest version of Next.js?", you must output exactly:',
-                '<search>latest Next.js version</search>',
-                '',
-                'Replace the keywords with what is actually relevant to the user\'s prompt. Never output the literal placeholder text "KEYWORDS" or "your search query".',
-            ].join('\n');
-        } else if (searchResults && searchResults.length > 0) {
-            // Second pass: the client has already run the search. Inject the
-            // results AND forbid the model from emitting another <search> tag —
-            // otherwise it can recurse and the raw tag leaks into the visible
-            // answer.
-            apiMessages.splice(apiMessages.length - 1, 0, {
-                role: 'system' as const,
-                content:
-                    formatSearchContext(searchResultsQuery || 'Search', searchResults) +
-                    '\n\nIMPORTANT: The web search has already been performed. Do NOT emit another <search> tag under any circumstances. Answer the user using the results above and cite sources like [1], [2].',
-            });
-        }
-
+        // ── Stream from NVIDIA with a hard timeout ──────────────────────────
         const temperature = adminSettings?.temperature ?? 0.7;
-        // Default to 1024 — covers ~750 words which handles most responses well.
-        // 2048 was the old default; the difference in TTFT is significant because
-        // the model has to plan token budgets before generating the first token.
         const maxTokens = adminSettings?.max_tokens ?? 1024;
         const modelName = dbModel.name || adminSettings?.model_name || 'meta/llama-3.1-8b-instruct';
 
-        // ── Stream response + track tokens ───────────────────────────────────────
-        // A per-request AbortController ensures the NVIDIA fetch is cancelled
-        // (and the client gets a real error) if the model doesn't respond within
-        // NVIDIA_TIMEOUT_MS. Without this the serverless function silently times
-        // out and the client sees a generic NetworkError.
         const timeoutController = new AbortController();
-        const timeoutId = setTimeout(
-            () => timeoutController.abort(),
-            NVIDIA_TIMEOUT_MS
-        );
+        const timeoutId = setTimeout(() => timeoutController.abort(), CHAT_NVIDIA_TIMEOUT_MS);
 
         let stream: ReadableStream<Uint8Array>;
         try {
@@ -318,10 +191,12 @@ export async function POST(request: NextRequest) {
             const isTimeout = (err as Error)?.name === 'AbortError';
             console.error('[Chat] NVIDIA stream error:', err);
             return NextResponse.json(
-                { error: isTimeout
-                    ? 'The AI model took too long to respond. Please try again.'
-                    : `Model error: ${(err as Error).message}` },
-                { status: isTimeout ? 504 : 502 }
+                {
+                    error: isTimeout
+                        ? 'The AI model took too long to respond. Please try again.'
+                        : `Model error: ${(err as Error).message}`,
+                },
+                { status: isTimeout ? 504 : 502 },
             );
         }
 
@@ -330,7 +205,7 @@ export async function POST(request: NextRequest) {
         const reader = textStream.getReader();
         const encoder = new TextEncoder();
 
-        const inputText = apiMessages.map(m => m.content).join(' ');
+        const inputText = apiMessages.map((m) => (typeof m.content === 'string' ? m.content : '')).join(' ');
         const inputTokens = estimateTokens(inputText);
         let outputChars = 0;
 
@@ -339,17 +214,8 @@ export async function POST(request: NextRequest) {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
-                        // Fire-and-forget token usage recording — don't block the stream close
                         const totalTokens = inputTokens + estimateTokens('x'.repeat(outputChars));
-                        supabase.from('token_usage').insert({
-                            user_id: user.id,
-                            model_id: modelId,
-                            tokens_used: totalTokens,
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        } as any).then(({ error }: any) => {
-                            if (error) console.error('Failed to record token usage:', error);
-                        });
-
+                        recordTokenUsage(supabase, user.id, modelId, totalTokens);
                         controller.close();
                         break;
                     }
@@ -364,16 +230,12 @@ export async function POST(request: NextRequest) {
             headers: {
                 'Content-Type': 'text/plain; charset=utf-8',
                 'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
+                Connection: 'keep-alive',
                 'X-Quota-Used': String(newTotal),
                 'X-Quota-Limit': String(quotaLimit),
             },
         });
     } catch (error) {
-        console.error('Chat API error:', error);
-        return NextResponse.json(
-            { error: 'Failed to process request' },
-            { status: 500 }
-        );
+        return surfaceServerError(error, 'Failed to process request', '[Chat] POST error:');
     }
 }
