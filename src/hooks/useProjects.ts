@@ -88,11 +88,12 @@ export function useProjects(): UseProjectsResult {
         const trimmed = name.trim();
         if (!trimmed) return null;
 
-        const { data, error } = await supabase
+        const result: any = await (supabase as any)
             .from('projects')
             .insert({ user_id: user.id, name: trimmed })
             .select()
             .single();
+        const { data, error } = result;
 
         if (error || !data) {
             console.error('Failed to create project:', error);
@@ -117,7 +118,7 @@ export function useProjects(): UseProjectsResult {
             )
         );
 
-        const { error } = await supabase
+        const { error }: any = await (supabase as any)
             .from('projects')
             .update({ name: trimmed })
             .eq('id', id);

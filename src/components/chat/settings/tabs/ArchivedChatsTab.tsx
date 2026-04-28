@@ -50,6 +50,7 @@ export function ArchivedChatsTab({ onOpenChat }: ArchivedChatsTabProps) {
                         updatedAt: new Date(s.updated_at),
                         isPinned: s.is_pinned ?? false,
                         isArchived: true,
+                        projectId: s.project_id ?? null,
                     }))
                 );
             }
