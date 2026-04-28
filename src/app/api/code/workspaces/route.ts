@@ -83,9 +83,30 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json({ id });
     } catch (err) {
-        console.error('[Builder] POST /workspaces error:', err);
+        // Surface the underlying Supabase/Postgres error so misconfigured
+        // schemas (missing tables, RLS, FK) don't show up as opaque 500s.
+        const e = err as {
+            message?: string;
+            code?: string;
+            details?: string;
+            hint?: string;
+        } | null;
+        console.error('[Builder] POST /workspaces error:', {
+            message: e?.message,
+            code: e?.code,
+            details: e?.details,
+            hint: e?.hint,
+            raw: err,
+        });
+        const detail =
+            e?.message ||
+            (typeof err === 'string' ? err : 'Failed to create workspace');
         return NextResponse.json(
-            { error: 'Failed to create workspace' },
+            {
+                error: `Failed to create workspace: ${detail}`,
+                code: e?.code,
+                hint: e?.hint,
+            },
             { status: 500 },
         );
     }
