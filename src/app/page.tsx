@@ -38,6 +38,7 @@ function ChatPageInner() {
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [pendingMessage, setPendingMessage] = useState('');
     const consumedSessionParamRef = useRef<string | null>(null);
+    const consumedProjectParamRef = useRef<string | null>(null);
 
     const {
         messages,
@@ -74,6 +75,23 @@ function ChatPageInner() {
             router.replace('/');
         }
     }, [searchParams, isAuthenticated, selectSession, router]);
+
+    // ── Start a project-bound new chat from `?project=<id>` (used by the
+    //    "New chat" button on the project page). The next session created via
+    //    `sendMessage` will be assigned to this project; the URL is then
+    //    cleared so subsequent new chats default back to no project. ────────
+    useEffect(() => {
+        const projectParam = searchParams.get('project');
+        if (
+            projectParam &&
+            isAuthenticated &&
+            consumedProjectParamRef.current !== projectParam
+        ) {
+            consumedProjectParamRef.current = projectParam;
+            newChat(projectParam);
+            router.replace('/');
+        }
+    }, [searchParams, isAuthenticated, newChat, router]);
 
     // ── QUOTA CHECKING ──────────────────────────────────────────────────────────
     const quota = useQuota(selectedModelId, models);

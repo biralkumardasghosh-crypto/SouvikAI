@@ -13,3 +13,5 @@ export { AttachmentPreview } from './AttachmentPreview';
 export { ImageLightbox } from './ImageLightbox';
 export { DragDropOverlay } from './DragDropOverlay';
 export { MessageAttachments } from './MessageAttachments';
+export { ProjectsSection } from './ProjectsSection';
+export { ProjectModal } from './ProjectModal';
