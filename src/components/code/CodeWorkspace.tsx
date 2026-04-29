@@ -34,7 +34,7 @@ interface CodeWorkspaceProps {
     models: AIModel[];
     selectedModelId: string;
     onModelChange: (id: string) => void;
-    onSelectFile: (path: string) => void;
+    onSelectFile: (path: string | null) => void;
     onUpdateFile: (path: string, content: string) => void;
     onSend: (text: string) => void;
     onStop: () => void;
@@ -503,7 +503,7 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                                     onClose={path => {
                                         setOpenTabs(prev => prev.filter(p => p !== path));
                                         if (props.activeFile === path) {
-                                            props.onSelectFile(openTabs.find(p => p !== path) ?? null as any);
+                                            props.onSelectFile(openTabs.find(p => p !== path) ?? null);
                                         }
                                     }}
                                 />
