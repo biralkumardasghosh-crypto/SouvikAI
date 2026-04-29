@@ -8,10 +8,11 @@ import { Button, SimpleTooltip } from '@/components/ui';
 import { BuilderChatInput } from '@/components/code/BuilderChatInput';
 import { useAuth } from '@/hooks/useAuth';
 import { useModels } from '@/hooks/useModels';
-import { FORGE_NEXT_MODEL_KEY } from '@/lib/codeHandoff';
+import { CODE_NEXT_MODEL_KEY } from '@/lib/codeHandoff';
+import { CodeSidebar } from '@/components/code/sidebar/CodeSidebar';
 
 /**
- * Forge home: a single, focused composer that captures the user's first
+ * Code home: a single, focused composer that captures the user's first
  * prompt, provisions a new workspace in Supabase, and routes them to
  * /code/[id] where the agent immediately picks up the pending message.
  *
@@ -45,7 +46,7 @@ export default function CodeLandingPage() {
                 if (typeof window !== 'undefined') {
                     try {
                         window.sessionStorage.setItem(
-                            FORGE_NEXT_MODEL_KEY,
+                            CODE_NEXT_MODEL_KEY,
                             selectedModelId,
                         );
                     } catch {
@@ -87,60 +88,64 @@ export default function CodeLandingPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-background">
-            {/* Slim top bar — escape hatch back to chat. Kept visually
-                quiet (no wordmark, no labels) so the page reads as just
-                title + composer. */}
-            <header className="shrink-0 flex items-center h-10 px-3">
-                <SimpleTooltip content="Back to chat" side="bottom">
-                    <Button
-                        asChild
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-7 w-7 text-foreground-muted hover:text-foreground"
-                    >
-                        <Link href="/" aria-label="Back to chat">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                </SimpleTooltip>
-            </header>
+        <div className="flex h-screen overflow-hidden bg-background">
+            <CodeSidebar />
+            
+            <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
+                {/* Slim top bar — escape hatch back to chat. Kept visually
+                    quiet (no wordmark, no labels) so the page reads as just
+                    title + composer. */}
+                <header className="shrink-0 flex items-center h-10 px-3 absolute top-0 left-0">
+                    <SimpleTooltip content="Back to chat" side="bottom">
+                        <Button
+                            asChild
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7 text-foreground-muted hover:text-foreground"
+                        >
+                            <Link href="/" aria-label="Back to chat">
+                                <ArrowLeft className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </SimpleTooltip>
+                </header>
 
-            <main className="flex-1 flex items-center justify-center px-4 pb-16">
-                <div className="w-full max-w-2xl">
-                    <h1 className="pb-1 text-3xl sm:text-4xl md:text-[40px] md:leading-[1.15] font-semibold tracking-tight text-foreground text-balance text-center">
-                        What will you build today?
-                    </h1>
+                <main className="flex-1 flex items-center justify-center px-4 pb-16">
+                    <div className="w-full max-w-2xl">
+                        <h1 className="pb-1 text-3xl sm:text-4xl md:text-[40px] md:leading-[1.15] font-semibold tracking-tight text-foreground text-balance text-center">
+                            What will you build today?
+                        </h1>
 
-                    <div className="mt-10 md:mt-12">
-                        {creating ? (
-                            <div className="flex items-center justify-center gap-2 h-[124px] rounded-2xl border border-border bg-surface text-foreground-muted">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span className="text-[14px]">Creating your build…</span>
-                            </div>
-                        ) : (
-                            <BuilderChatInput
-                                variant="centered"
-                                placeholder="Describe an app, a page, or a component…"
-                                onSend={handleSend}
-                                models={models}
-                                selectedModelId={selectedModelId}
-                                onModelChange={setSelectedModelId}
-                                autoFocus
-                            />
-                        )}
+                        <div className="mt-10 md:mt-12">
+                            {creating ? (
+                                <div className="flex items-center justify-center gap-2 h-[124px] rounded-2xl border border-border bg-surface text-foreground-muted">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-[14px]">Creating your build…</span>
+                                </div>
+                            ) : (
+                                <BuilderChatInput
+                                    variant="centered"
+                                    placeholder="Describe an app, a page, or a component…"
+                                    onSend={handleSend}
+                                    models={models}
+                                    selectedModelId={selectedModelId}
+                                    onModelChange={setSelectedModelId}
+                                    autoFocus
+                                />
+                            )}
 
-                        {createError && (
-                            <div
-                                role="alert"
-                                className="mt-3 px-3 py-2 rounded-md text-[13px] bg-destructive/10 text-destructive border border-destructive/20"
-                            >
-                                {createError}
-                            </div>
-                        )}
+                            {createError && (
+                                <div
+                                    role="alert"
+                                    className="mt-3 px-3 py-2 rounded-md text-[13px] bg-destructive/10 text-destructive border border-destructive/20"
+                                >
+                                    {createError}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </main>
+                </main>
+            </div>
         </div>
     );
 }

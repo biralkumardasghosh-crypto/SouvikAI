@@ -25,7 +25,7 @@ interface BuilderChatInputProps {
 
 export function BuilderChatInput({
     variant = 'compact',
-    placeholder = 'Ask Forge to create or change something…',
+    placeholder = 'Ask Code to create or change something…',
     isStreaming,
     disabled,
     initialValue = '',

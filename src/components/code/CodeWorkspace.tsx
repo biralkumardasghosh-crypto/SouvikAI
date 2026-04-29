@@ -12,7 +12,11 @@ import {
 import { cn } from '@/lib/utils';
 import { Button, SimpleTooltip } from '@/components/ui';
 import { BuilderChatPanel } from './BuilderChatPanel';
-import { CodeEditor } from './CodeEditor';
+import { CodeEditor } from '../editor/CodeEditor';
+import { EditorTabs } from '../editor/EditorTabs';
+import { Breadcrumb } from '../editor/Breadcrumb';
+import { Minimap } from '../editor/Minimap';
+import { StatusBar } from '../editor/StatusBar';
 import { CodePreview, buildPreviewHTML } from './CodePreview';
 import { DiffPanel } from './DiffPanel';
 import { FileTree } from './FileTree';
@@ -38,7 +42,7 @@ interface CodeWorkspaceProps {
     onRejectChanges: (messageId: string, paths?: string[] | null) => Promise<void>;
 }
 
-const CHAT_WIDTH_STORAGE_KEY = 'forge:chatPanelWidth';
+const CHAT_WIDTH_STORAGE_KEY = 'code:chatPanelWidth';
 const CHAT_WIDTH_DEFAULT = 360;
 const CHAT_WIDTH_MIN = 260;
 const CHAT_WIDTH_MAX_FALLBACK = 720;
@@ -75,6 +79,19 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
     const [view, setView] = useState<WorkspaceView>('editor');
     const [mobileTab, setMobileTab] = useState<'chat' | 'right'>('chat');
     const [reloadKey, setReloadKey] = useState(0);
+
+    // Advanced editor state
+    const [openTabs, setOpenTabs] = useState<string[]>([]);
+    const [showMinimap, setShowMinimap] = useState(true);
+    const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Keep tabs in sync with active file
+    useEffect(() => {
+        if (props.activeFile && !openTabs.includes(props.activeFile)) {
+            setOpenTabs(prev => [...prev, props.activeFile!]);
+        }
+    }, [props.activeFile, openTabs]);
 
     // Total pending changes across all assistant messages — drives the
     // "Review" tab badge.
@@ -296,7 +313,7 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                         size="icon-sm"
                         className="h-7 w-7 text-foreground-muted hover:text-foreground"
                     >
-                        <Link href="/code" aria-label="Back to Builder home">
+                        <Link href="/code" aria-label="Back to Code home">
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
                     </Button>
@@ -307,7 +324,7 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
                         <Sparkles className="h-3 w-3" />
                     </div>
                     <span className="text-[13px] font-semibold text-foreground hidden sm:inline">
-                        Forge
+                        Code
                     </span>
                 </div>
 
@@ -471,20 +488,49 @@ export function CodeWorkspace(props: CodeWorkspaceProps) {
 
                     {view === 'editor' && (
                         <div className="flex-1 min-h-0 flex">
-                            <div className="w-[200px] shrink-0 border-r border-border-subtle bg-surface overflow-y-auto">
+                            <div className="w-[200px] shrink-0 border-r border-[#3e3e42] bg-[#252526] overflow-y-auto">
                                 <FileTree
                                     files={props.files}
                                     activeFile={props.activeFile}
                                     onSelectFile={props.onSelectFile}
                                 />
                             </div>
-                            <div className="flex-1 min-w-0 flex flex-col">
-                                <CodeEditor
-                                    path={props.activeFile}
-                                    value={activeContent}
-                                    onChange={(next) =>
-                                        props.activeFile && props.onUpdateFile(props.activeFile, next)
-                                    }
+                            <div className="flex-1 min-w-0 flex flex-col bg-[#1e1e1e]">
+                                <EditorTabs
+                                    openTabs={openTabs}
+                                    activePath={props.activeFile}
+                                    onSelect={props.onSelectFile}
+                                    onClose={path => {
+                                        setOpenTabs(prev => prev.filter(p => p !== path));
+                                        if (props.activeFile === path) {
+                                            props.onSelectFile(openTabs.find(p => p !== path) ?? null as any);
+                                        }
+                                    }}
+                                />
+                                <Breadcrumb activePath={props.activeFile} />
+                                <div className="flex-1 min-h-0 flex relative">
+                                    <CodeEditor
+                                        path={props.activeFile}
+                                        value={activeContent}
+                                        onChange={(next) =>
+                                            props.activeFile && props.onUpdateFile(props.activeFile, next)
+                                        }
+                                        onPositionChange={(line, col) => setCursorPos({ line, col })}
+                                        scrollRef={scrollRef}
+                                    />
+                                    <Minimap
+                                        path={props.activeFile}
+                                        content={activeContent}
+                                        scrollContainerRef={scrollRef}
+                                        isVisible={showMinimap}
+                                        onToggle={() => setShowMinimap(!showMinimap)}
+                                    />
+                                </div>
+                                <StatusBar
+                                    activePath={props.activeFile}
+                                    line={cursorPos.line}
+                                    col={cursorPos.col}
+                                    isSaving={false}
                                 />
                             </div>
                         </div>

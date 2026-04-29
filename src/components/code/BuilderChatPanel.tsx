@@ -28,7 +28,7 @@ interface BuilderChatPanelProps {
 /**
  * Left pane of the workspace: scrollable conversation thread + composer.
  *
- * The Forge brand and project title live in the workspace's main header
+ * The Code brand and project title live in the workspace's main header
  * (one row up), so this panel intentionally has NO header of its own —
  * conversation begins flush with the top edge of the column, reclaiming
  * the previous duplicated 48px header band for actual messages.
@@ -84,7 +84,7 @@ export function BuilderChatPanel({
             <div className="shrink-0 px-3 pb-3 pt-2 border-t border-border-subtle bg-background">
                 <BuilderChatInput
                     variant="compact"
-                    placeholder="Tell Forge what to change…"
+                    placeholder="Tell Code what to change…"
                     isStreaming={isStreaming}
                     onSend={onSend}
                     onStop={onStop}

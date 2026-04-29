@@ -14,7 +14,7 @@ import type { LucideIcon } from 'lucide-react';
  */
 
 export type StickyNavAction = 'new-chat' | 'search';
-export type ScrollableNavAction = 'images' | 'apps' | 'forge';
+export type ScrollableNavAction = 'images' | 'apps' | 'code';
 
 export interface StickyNavItem {
     icon: LucideIcon;
@@ -40,5 +40,5 @@ export const STICKY_NAV_ITEMS: StickyNavItem[] = [
 export const SCROLLABLE_NAV_ITEMS: ScrollableNavItem[] = [
     { icon: ImageIcon, label: 'Images', action: 'images', href: undefined },
     { icon: Grid2X2,   label: 'Apps',   action: 'apps',   href: undefined },
-    { icon: Code2,     label: 'Forge',  action: 'forge',  href: '/code' },
+    { icon: Code2,     label: 'Code',  action: 'code',  href: '/code' },
 ];

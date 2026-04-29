@@ -4,4 +4,4 @@
  * page reads this once on mount, applies it via `setSelectedModelId`,
  * then clears the key so it doesn't leak to the next build.
  */
-export const FORGE_NEXT_MODEL_KEY = 'forge:nextModel';
+export const CODE_NEXT_MODEL_KEY = 'code:nextModel';

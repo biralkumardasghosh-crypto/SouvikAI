@@ -9,7 +9,7 @@ import { useBuilderAgent } from '@/hooks/useBuilderAgent';
 import { useModels } from '@/hooks/useModels';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui';
-import { FORGE_NEXT_MODEL_KEY } from '@/lib/codeHandoff';
+import { CODE_NEXT_MODEL_KEY } from '@/lib/codeHandoff';
 
 export default function BuilderWorkspacePage() {
     const params = useParams<{ id: string }>();
@@ -51,10 +51,10 @@ export default function BuilderWorkspacePage() {
         if (typeof window === 'undefined') return;
         seededModelRef.current = true;
         try {
-            const stored = window.sessionStorage.getItem(FORGE_NEXT_MODEL_KEY);
+            const stored = window.sessionStorage.getItem(CODE_NEXT_MODEL_KEY);
             if (stored) {
                 setSelectedModelId(stored);
-                window.sessionStorage.removeItem(FORGE_NEXT_MODEL_KEY);
+                window.sessionStorage.removeItem(CODE_NEXT_MODEL_KEY);
             }
         } catch {
             /* sessionStorage may be disabled — fall back to default */
@@ -112,7 +112,7 @@ export default function BuilderWorkspacePage() {
                 </p>
                 <Button asChild variant="outline" className="mt-6">
                     <Link href="/code">
-                        <ArrowLeft className="h-4 w-4 mr-2" /> Back to Forge home
+                        <ArrowLeft className="h-4 w-4 mr-2" /> Back to Code home
                     </Link>
                 </Button>
             </div>
