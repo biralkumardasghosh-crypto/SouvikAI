@@ -9,6 +9,7 @@ import { useBuilderAgent } from '@/hooks/useBuilderAgent';
 import { useModels } from '@/hooks/useModels';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui';
+import { FORGE_NEXT_MODEL_KEY } from '../page';
 
 export default function BuilderWorkspacePage() {
     const params = useParams<{ id: string }>();
@@ -40,6 +41,25 @@ export default function BuilderWorkspacePage() {
             router.push('/signin');
         }
     }, [authLoading, isAuthenticated, router]);
+
+    // Pick up the model the user selected on the /code landing composer
+    // (if any) and seed the workspace's selected model with it. Read +
+    // clear once on mount so subsequent reloads don't get sticky values.
+    const seededModelRef = useRef(false);
+    useEffect(() => {
+        if (seededModelRef.current) return;
+        if (typeof window === 'undefined') return;
+        seededModelRef.current = true;
+        try {
+            const stored = window.sessionStorage.getItem(FORGE_NEXT_MODEL_KEY);
+            if (stored) {
+                setSelectedModelId(stored);
+                window.sessionStorage.removeItem(FORGE_NEXT_MODEL_KEY);
+            }
+        } catch {
+            /* sessionStorage may be disabled — fall back to default */
+        }
+    }, [setSelectedModelId]);
 
     // After hydration, if the most recent message is an unanswered user
     // turn — typically the seed message inserted at workspace creation — kick
