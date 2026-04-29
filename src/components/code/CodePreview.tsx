@@ -236,12 +236,22 @@ const PREVIEW_TEMPLATE = (compiledSrc: string, entryPath: string) => `<!doctype 
   </head>
   <body>
     <div id="root"></div>
-    <script type="text/babel" data-presets="env,react,typescript" data-type="module">
-      ${compiledSrc}
-    </script>
     <script>
-      // Wait for Babel to finish transforming the script above, then mount.
-      window.addEventListener('DOMContentLoaded', function () {
+      // Surface uncaught errors from the Babel-transformed script below.
+      window.addEventListener('error', function (e) {
+        document.body.insertAdjacentHTML('afterbegin',
+          '<div class="builder-error">' + (e && e.message ? String(e.message) : 'Unknown error') + '</div>');
+      });
+    </script>
+    <script type="text/babel" data-presets="env,react,typescript">
+      ${compiledSrc}
+
+      // Mount synchronously at the end of THIS script so we run after the
+      // user's code has executed (Babel-standalone transforms text/babel
+      // scripts asynchronously after DOMContentLoaded, so a separate
+      // DOMContentLoaded listener would race ahead of this and report
+      // "No component to render" even when the entry compiles fine).
+      ;(function () {
         try {
           var Component = window.__BUILDER_DEFAULT_EXPORT__;
           if (!Component) {
@@ -255,11 +265,7 @@ const PREVIEW_TEMPLATE = (compiledSrc: string, entryPath: string) => `<!doctype 
           document.body.insertAdjacentHTML('afterbegin',
             '<div class="builder-error">' + (err && err.message ? String(err.message) : String(err)) + '</div>');
         }
-      });
-      window.addEventListener('error', function (e) {
-        document.body.insertAdjacentHTML('afterbegin',
-          '<div class="builder-error">' + (e && e.message ? String(e.message) : 'Unknown error') + '</div>');
-      });
+      })();
     </script>
   </body>
 </html>`;
