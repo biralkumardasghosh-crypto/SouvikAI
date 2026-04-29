@@ -108,11 +108,11 @@ export default function CodeLandingPage() {
 
             <main className="flex-1 flex items-center justify-center px-4 pb-16">
                 <div className="w-full max-w-2xl">
-                    <h1 className="text-3xl sm:text-4xl md:text-[40px] md:leading-[1.1] font-semibold tracking-tight text-foreground text-balance text-center">
+                    <h1 className="pb-1 text-3xl sm:text-4xl md:text-[40px] md:leading-[1.15] font-semibold tracking-tight text-foreground text-balance text-center">
                         What will you build today?
                     </h1>
 
-                    <div className="mt-8">
+                    <div className="mt-10 md:mt-12">
                         {creating ? (
                             <div className="flex items-center justify-center gap-2 h-[124px] rounded-2xl border border-border bg-surface text-foreground-muted">
                                 <Loader2 className="h-4 w-4 animate-spin" />
