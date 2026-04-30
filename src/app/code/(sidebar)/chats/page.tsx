@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, MoreHorizontal, FolderPlus, ListFilter, X, CircleDashed, Star, StarOff } from 'lucide-react';
+import { Search, MoreHorizontal, FolderPlus, ListFilter, X, CircleDashed, Star } from 'lucide-react';
 import { useCodeWorkspaces } from '@/contexts/CodeWorkspacesContext';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/utils/date-helpers';
@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import type { BuilderWorkspaceSummary } from '@/types/code';
 
 export default function ChatsPage() {
-    const { workspaces, isLoading, favorites, toggleFavorite, deleteWorkspace } = useCodeWorkspaces();
+    const { workspaces, isLoading, favorites, toggleFavorite } = useCodeWorkspaces();
     const { user } = useAuth();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
@@ -145,7 +145,7 @@ function ChatRow({
                 </div>
 
                 <span className="text-[13px] text-foreground-muted shrink-0 w-12 text-right">
-                    {formatRelativeTime(workspace.updatedAt).replace(' ago', ' ago')}
+                    {formatRelativeTime(new Date(workspace.updatedAt)).replace(' ago', ' ago')}
                 </span>
                 <div className="h-5 w-5 rounded-full bg-gradient-to-br from-pink-500 to-orange-400 shrink-0" />
                 <button 

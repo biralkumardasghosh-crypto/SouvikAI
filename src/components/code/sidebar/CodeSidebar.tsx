@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { BuilderWorkspaceSummary } from '@/types/code';
 import { SidebarHeader } from './SidebarHeader';
 import { SidebarNav } from './SidebarNav';
 import { WorkspaceList } from './WorkspaceList';

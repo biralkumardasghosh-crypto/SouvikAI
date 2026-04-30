@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Search, Plus, Clock, Folder, MessageCircle, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -45,37 +45,41 @@ export function CodeSearchModal({ open, onClose, workspaces }: CodeSearchModalPr
     }, [router, onClose]);
 
     // Compute items for the list
-    const items: SearchItem[] = [];
-    
-    if (query.trim()) {
-        const lowerQuery = query.toLowerCase();
+    const items = React.useMemo(() => {
+        const result: SearchItem[] = [];
         
-        // Match projects
-        for (const p of projects) {
-            if (p.name.toLowerCase().includes(lowerQuery)) {
-                items.push({ type: 'project', item: p });
+        if (query.trim()) {
+            const lowerQuery = query.toLowerCase();
+            
+            // Match projects
+            for (const p of projects) {
+                if (p.name.toLowerCase().includes(lowerQuery)) {
+                    result.push({ type: 'project', item: p });
+                }
+            }
+            
+            // Match workspaces
+            for (const w of workspaces) {
+                if (w.title.toLowerCase().includes(lowerQuery)) {
+                    result.push({ type: 'workspace', item: w });
+                }
+            }
+        } else {
+            // Default empty state matching the reference image
+            result.push({ type: 'action', id: 'new-chat', label: 'New Chat', icon: <Plus className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleNewChat });
+            result.push({ type: 'action', id: 'all-recent', label: 'All Recent Chats', icon: <Clock className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleAllRecentChats });
+            result.push({ type: 'action', id: 'projects', label: 'Projects', icon: <Folder className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleProjects });
+            
+            // Recent chats (up to 15)
+            workspaces.slice(0, 15).forEach(w => result.push({ type: 'workspace', item: w }));
+            
+            if (workspaces.length > 0) {
+                result.push({ type: 'view-all', onClick: handleAllRecentChats });
             }
         }
         
-        // Match workspaces
-        for (const w of workspaces) {
-            if (w.title.toLowerCase().includes(lowerQuery)) {
-                items.push({ type: 'workspace', item: w });
-            }
-        }
-    } else {
-        // Default empty state matching the reference image
-        items.push({ type: 'action', id: 'new-chat', label: 'New Chat', icon: <Plus className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleNewChat });
-        items.push({ type: 'action', id: 'all-recent', label: 'All Recent Chats', icon: <Clock className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleAllRecentChats });
-        items.push({ type: 'action', id: 'projects', label: 'Projects', icon: <Folder className="h-4 w-4 shrink-0 text-foreground" />, onClick: handleProjects });
-        
-        // Recent chats (up to 15)
-        workspaces.slice(0, 15).forEach(w => items.push({ type: 'workspace', item: w }));
-        
-        if (workspaces.length > 0) {
-            items.push({ type: 'view-all', onClick: handleAllRecentChats });
-        }
-    }
+        return result;
+    }, [query, projects, workspaces, handleNewChat, handleAllRecentChats, handleProjects]);
 
     // Reset state when modal opens
     useEffect(() => {
@@ -197,7 +201,7 @@ export function CodeSearchModal({ open, onClose, workspaces }: CodeSearchModalPr
                                 <div className="flex flex-col mb-4">
                                     {items.filter(i => i.type === 'action').map((item, i) => (
                                         <SearchItemRow 
-                                            key={(item as any).id}
+                                            key={item.type === 'action' ? item.id : `action-${i}`}
                                             item={item}
                                             index={i}
                                             activeIndex={activeIndex}
