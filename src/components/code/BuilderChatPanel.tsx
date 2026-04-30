@@ -119,6 +119,16 @@ function MessageView({
     const isThisStreaming = !!message.isStreaming && isStreaming;
     const hasSteps = (message.steps?.length ?? 0) > 0;
 
+    // The streaming model often emits leading/trailing whitespace (e.g.
+    // "\n\n") between its closing tool tag and the start of its free-form
+    // reply. With `whitespace-pre-wrap` those newlines render as a visible
+    // empty band between the timeline and the message — strip them so the
+    // text sits flush under the "X steps · X changes" header.
+    const displayContent = isThisStreaming
+        ? message.content.replace(/^\s+/, '')
+        : message.content.trim();
+    const hasDisplayContent = displayContent.length > 0;
+
     return (
         <div className="flex flex-col max-w-full">
             {hasSteps && (
@@ -127,7 +137,7 @@ function MessageView({
                     isStreaming={isThisStreaming}
                 />
             )}
-            {message.content && (
+            {hasDisplayContent && (
                 <div
                     className={cn(
                         'text-[14px] leading-relaxed whitespace-pre-wrap break-words',
@@ -135,13 +145,13 @@ function MessageView({
                         message.errored ? 'text-destructive' : 'text-foreground',
                     )}
                 >
-                    {message.content}
+                    {displayContent}
                     {isThisStreaming && (
                         <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-foreground/70 animate-pulse" />
                     )}
                 </div>
             )}
-            {!message.content && isThisStreaming && !hasSteps && (
+            {!hasDisplayContent && isThisStreaming && !hasSteps && (
                 <div className="flex items-center gap-1 text-foreground-subtle text-[13px]">
                     <span className="typing-dot">·</span>
                     <span className="typing-dot">·</span>
