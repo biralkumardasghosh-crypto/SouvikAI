@@ -14,7 +14,26 @@ interface CodePreviewProps {
  * pipeline needed. The Node.js tailwindcss/postcss/autoprefixer packages crash
  * Sandpack's in-browser Node runtime (exit code 1) because they rely on the
  * real Node fs/path modules that are only partially shimmed.
+ *
+ * These files are stripped before being passed to Sandpack even if the agent
+ * wrote them, because they all require the PostCSS pipeline to function.
  */
+const SANDPACK_BLOCKED_FILES = new Set([
+    'tailwind.config.js',
+    'tailwind.config.ts',
+    'postcss.config.js',
+    'postcss.config.ts',
+    'postcss.config.mjs',
+]);
+
+/**
+ * Returns true for globals.css / global.css files that use @tailwind directives
+ * (which only work through PostCSS). The agent is instructed not to generate
+ * these, but this guard catches any that slip through.
+ */
+function isAtTailwindCss(content: string): boolean {
+    return content.includes('@tailwind');
+}
 const DEFAULT_LAYOUT = `
 export const metadata = {
   title: 'Preview',
@@ -46,6 +65,13 @@ export function CodePreview({ files, reloadKey = 0 }: CodePreviewProps) {
             '/app/layout.tsx': DEFAULT_LAYOUT,
         };
         for (const [path, content] of Object.entries(files)) {
+            // Strip files that require the PostCSS/Node.js pipeline — they
+            // crash Sandpack's in-browser runtime. Tailwind is available via
+            // Play CDN in the layout, so these files are never needed.
+            const basename = path.split('/').pop() ?? path;
+            if (SANDPACK_BLOCKED_FILES.has(basename)) continue;
+            if ((basename === 'globals.css' || basename === 'global.css') &&
+                isAtTailwindCss(content)) continue;
             result[`/${path}`] = content;
         }
         return result;

@@ -56,17 +56,22 @@ ${toolDocs}
   2. NEVER nest action tags. Each action stands alone.
   3. ALWAYS use Tailwind utility classes for styling. Do not write custom CSS
      unless absolutely necessary.
-  4. The project uses the Next.js App Router. Pages live under \`app/\`.
+  4. Tailwind CSS is pre-loaded via CDN — do NOT create \`tailwind.config.js\`,
+     \`tailwind.config.ts\`, \`postcss.config.js\`, or any PostCSS config.
+     Do NOT write \`@tailwind base\`, \`@tailwind components\`, or
+     \`@tailwind utilities\` directives in any CSS file. They have no effect
+     in the preview environment and will break the sandbox.
+  5. The project uses the Next.js App Router. Pages live under \`app/\`.
      Server components are the default; only add \`'use client'\` when needed
      (event handlers, hooks, browser APIs).
-  5. Use TypeScript. Use \`.tsx\` for React components, \`.ts\` for utilities.
-  6. Keep components small and focused. Extract repeated UI into components.
-  7. Emit at least one milestone before any action, and after the final action
+  6. Use TypeScript. Use \`.tsx\` for React components, \`.ts\` for utilities.
+  7. Keep components small and focused. Extract repeated UI into components.
+  8. Emit at least one milestone before any action, and after the final action
      write a short (1–3 sentence) plain-prose summary of what changed.
-  8. Never include explanations between action tags — only milestones, actions,
+  9. Never include explanations between action tags — only milestones, actions,
      and the final summary.
-  9. Do NOT wrap action contents in \`\\\`\\\`\\\`\` code fences. Write raw file
-     contents inside the action body.
+  10. Do NOT wrap action contents in \`\\\`\\\`\\\`\` code fences. Write raw file
+      contents inside the action body.
 
 ## Style
 
