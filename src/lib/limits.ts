@@ -34,4 +34,4 @@ export const CHAT_NVIDIA_TIMEOUT_MS = 25_000;
 export const BUILDER_NVIDIA_TIMEOUT_MS = 45_000;
 
 /** Google AI fetch timeout for the chat route. */
-export const CHAT_GOOGLE_TIMEOUT_MS = 30_000;
+export const CHAT_GOOGLE_TIMEOUT_MS = 60_000;

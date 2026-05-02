@@ -204,7 +204,12 @@ export async function POST(request: NextRequest) {
             }
         } catch (err) {
             clearTimeout(timeoutId);
-            const isTimeout = (err as Error)?.name === 'AbortError';
+            // Node 18+ wraps an aborted fetch in a TypeError whose .cause is
+            // the real AbortError — check both layers.
+            const cause = (err as NodeJS.ErrnoException)?.cause as Error | undefined;
+            const isTimeout =
+                (err as Error)?.name === 'AbortError' ||
+                cause?.name === 'AbortError';
             console.error(`[Chat] ${provider} stream error:`, err);
             return NextResponse.json(
                 {
